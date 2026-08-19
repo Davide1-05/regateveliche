@@ -1,0 +1,255 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================================
+   Centralized Design System - SAIL PLATFORM V3.1
+   All colors and styles should reference these values
+   ============================================ */
+
+/* Color Palette (matching HomePage theme) */
+:root {
+  /* Primary blues from the gradient background */
+  --color-blue-900: #1e3a5f;
+  --color-blue-800: #2d5a7a;
+  --color-cyan-400: #67e8f9;
+  --color-cyan-300: #a5f3fc;
+  
+  /* Text colors for dark backgrounds */
+  --text-primary: #ffffff;
+  --text-secondary: #dbeafe;
+  --text-muted: #bfdbfe;
+}
+
+/* ============================================
+   Global Body Styles - Dark Blue Gradient Background
+   ============================================ */
+body {
+  @apply bg-gradient-to-br from-blue-900 via-blue-800 to-cyan-700 text-white antialiased min-h-screen;
+  margin: 0;
+  padding: 0;
+}
+
+/* ============================================
+   Background Image Overlay (matching HomePage)
+   Usage: Add this class where you want the background image with overlay
+   ============================================ */
+.bg-home-background {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: -1;
+}
+
+.bg-home-background::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to bottom right,
+    rgba(30, 58, 95, 0.92),
+    rgba(45, 90, 122, 0.88),
+    rgba(8, 106, 130, 0.85)
+  );
+}
+
+/* ============================================
+   Reusable Component Styles
+   ============================================ */
+
+/* Card style matching HomePage feature cards */
+.card-glass {
+  @apply bg-white/10 backdrop-blur-sm rounded-xl p-6 border border-white/20 hover:bg-white/15 transition-colors;
+}
+
+/* White card for forms and content panels (auth pages) */
+.card-white {
+  @apply bg-white rounded-2xl shadow-xl p-8;
+}
+
+/* ============================================
+   Button Styles
+   ============================================ */
+.btn-primary {
+  @apply inline-block bg-cyan-400 text-blue-900 px-6 py-3 rounded-lg font-bold hover:bg-cyan-300 transition-colors shadow-md disabled:opacity-50 disabled:cursor-not-allowed;
+}
+
+.btn-secondary {
+  @apply inline-block bg-white/10 backdrop-blur-sm text-white px-4 py-2 rounded-lg border border-white/20 hover:bg-white/20 transition-colors font-semibold;
+}
+
+/* ============================================
+   Input Styles (for dark backgrounds)
+   ============================================ */
+.input-dark {
+  @apply w-full px-4 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg text-white placeholder-blue-200 focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-transparent transition-all;
+}
+
+/* ============================================
+   Typography for Dark Backgrounds
+   ============================================ */
+.text-heading {
+  @apply text-white font-bold leading-tight;
+}
+
+.text-subheading {
+  @apply text-blue-100;
+}
+
+.text-muted {
+  @apply text-blue-200;
+}
+
+/* ============================================
+   Custom component styles (Tailwind layers)
+   ============================================ */
+@layer components {
+  /* Button Styles - Dark Theme (matching HomePage) */
+  .btn-primary {
+    @apply inline-flex items-center justify-center px-6 py-3 bg-gradient-to-r from-cyan-400 to-blue-400 text-blue-900 rounded-xl font-bold hover:from-cyan-300 hover:to-blue-300 transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .btn-primary-gradient {
+    @apply inline-flex items-center justify-center px-6 py-3 bg-gradient-to-r from-cyan-400 to-blue-400 text-blue-900 rounded-xl font-bold hover:from-cyan-300 hover:to-blue-300 transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .btn-primary-solid {
+    @apply inline-flex items-center justify-center px-6 py-3 bg-cyan-400 text-blue-900 rounded-lg font-bold hover:bg-cyan-300 transition-colors shadow-md disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .btn-secondary {
+    @apply inline-flex items-center justify-center px-6 py-3 bg-white/10 backdrop-blur-sm text-blue-200 rounded-lg border border-white/20 hover:bg-white/20 transition-colors font-semibold disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .btn-secondary-solid {
+    @apply inline-flex items-center justify-center px-6 py-3 bg-white text-blue-900 rounded-lg hover:bg-cyan-50 transition-colors font-semibold shadow-sm disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  /* Input Styles - Dark Theme (matching HomePage) */
+  .input-dark {
+    @apply w-full px-4 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg text-white placeholder-blue-300 focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-transparent transition-all disabled:bg-white/5 disabled:text-blue-300;
+  }
+
+  .input-dark-sm {
+    @apply px-3 py-1.5 border border-white/20 bg-white/10 rounded-lg text-sm focus:ring-2 focus:ring-cyan-400 text-blue-100;
+  }
+
+  /* Card Styles - Dark Theme (matching HomePage) */
+  .card-glass {
+    @apply bg-white/10 backdrop-blur-sm rounded-xl p-6 border border-white/20 hover:bg-white/15 transition-colors;
+  }
+
+  .card-glass-lg {
+    @apply bg-white/10 backdrop-blur-md rounded-2xl shadow-lg border border-white/20 p-6;
+  }
+
+  /* Alert Styles - Dark Theme (matching HomePage) */
+  .alert-error {
+    @apply mb-6 p-4 bg-red-500/20 border border-red-400/30 rounded-xl text-red-300;
+  }
+
+  .alert-success {
+    @apply mb-6 p-4 bg-green-500/20 border border-green-400/30 rounded-xl text-green-300;
+  }
+
+  .alert-warning {
+    @apply mb-6 p-4 bg-yellow-500/20 border border-yellow-400/30 rounded-xl text-yellow-300;
+  }
+
+  /* Badge Styles - Dark Theme (matching HomePage) */
+  .badge-new {
+    @apply bg-cyan-400 text-blue-900 px-2 py-0.5 rounded-full text-xs font-semibold;
+  }
+
+  .badge-success {
+    @apply bg-green-500/20 border border-green-400/30 text-green-300 px-2 py-1 rounded-lg text-sm flex items-center gap-2;
+  }
+
+  /* Loading Spinner - Dark Theme (matching HomePage) */
+  .spinner {
+    @apply animate-spin rounded-full h-12 w-12 border-b-2 border-cyan-400 mx-auto;
+  }
+
+  /* ============================================
+     Background Styles - Centralized for all pages
+     ============================================ */
+  
+  /* Full-page dark gradient background (matching HomePage) */
+  .bg-dark-gradient {
+    @apply bg-gradient-to-br from-blue-900/92 via-blue-800/88 to-cyan-700/85;
+  }
+
+  /* Dark gradient with background image overlay */
+  .bg-dark-with-image {
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+  }
+
+  .bg-dark-with-image::before {
+    content: '';
+    @apply absolute inset-0 bg-gradient-to-br from-blue-900/92 via-blue-800/88 to-cyan-700/85;
+  }
+
+  /* ============================================
+     Layout Styles - Centralized for all pages
+     ============================================ */
+  
+  /* Page container matching HomePage's container style */
+  .page-container {
+    @apply container mx-auto px-6;
+  }
+
+  /* Section spacing matching HomePage */
+  .section-hero {
+    @apply pt-20 pb-32 text-center;
+  }
+
+  /* Feature grid layout (matching HomePage) */
+  .grid-features {
+    @apply grid md:grid-cols-3 gap-6 mt-16 max-w-6xl mx-auto;
+  }
+
+  /* ============================================
+     Scrollbar Styling - Dark Theme
+     ============================================ */
+  ::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: rgba(30, 58, 95, 0.5);
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: rgba(103, 232, 249, 0.5);
+    border-radius: 4px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(103, 232, 249, 0.7);
+  }
+
+  /* ============================================
+     Animations - Centralized for all pages
+     ============================================ */
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .animate-fade-in {
+    animation: fadeIn 0.5s ease-out forwards;
+  }
+
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateX(-20px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+
+  .animate-slide-in {
+    animation: slideIn 0.4s ease-out forwards;
+  }
+}
