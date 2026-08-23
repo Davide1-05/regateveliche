@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import axios from 'axios'
 import backgroundImg from '../images/background.png'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import BuoyMapManager from '../components/BuoyMapManager'
 
 interface Regatta {
@@ -43,30 +43,56 @@ interface Buoy {
   device_id?: string | null
 }
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+interface CrewMemberView {
+  id: string
+  name: string
+  email: string
+  phone?: string
+  role: string
+  status: string
+}
 
-// Default coordinates for Mediterranean sailing area (if not specified)
+interface RegistrationEntry {
+  id: string
+  sail_number: string
+  boat_class: string
+  hull_number?: string
+  skipper_name: string
+  status: string
+  registered_at: string
+  crew_count: number
+  crew_members: CrewMemberView[]
+}
+
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 const DEFAULT_CENTER_LAT = 44.0
 const DEFAULT_CENTER_LON = 10.0
 
 export function RegattasPage() {
+  const navigate = useNavigate()
   const [regattas, setRegattas] = useState<Regatta[]>([])
   const [filteredRegattas, setFilteredRegattas] = useState<Regatta[]>([])
   const [clubs, setClubs] = useState<Club[]>([])
   const [loading, setLoading] = useState(true)
+
+  // Filters
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [clubFilter, setClubFilter] = useState<string>('all')
-  
-  // Regatta form state
+
+  // Modals and Forms
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [editingRegatta, setEditingRegatta] = useState<Regatta | null>(null)
-  const [createdRegattaId, setCreatedRegattaId] = useState<string | null>(null)
-  
-  // Buoy management state
+
+  // Race Course Map View
+  const [activeMapRegatta, setActiveMapRegatta] = useState<Regatta | null>(null)
   const [buoys, setBuoys] = useState<Buoy[]>([])
-  const [showBuoyMap, setShowBuoyMap] = useState(false)
-  
+
+  // Entries / Crew Modal
+  const [selectedRegattaForEntries, setSelectedRegattaForEntries] = useState<Regatta | null>(null)
+  const [entries, setEntries] = useState<RegistrationEntry[]>([])
+  const [entriesLoading, setEntriesLoading] = useState(false)
+
   const [formData, setFormData] = useState({
     name: '',
     code: '',
@@ -84,30 +110,7 @@ export function RegattasPage() {
     fetchClubs()
   }, [])
 
-  // Fetch buoys when viewing a regatta or after creation
-  useEffect(() => {
-    if (createdRegattaId) {
-      fetchBuoys(createdRegattaId)
-    }
-  }, [createdRegattaId])
-
-  // Update form coordinates when map is opened (sync with map center)
-  useEffect(() => {
-    if (showBuoyMap && createdRegattaId) {
-      const regatta = regattas.find(r => r.id === createdRegattaId)
-      const lat = regatta?.latitude
-      const lon = regatta?.longitude
-      // Update form coordinates from map center if not already set
-      if (lat != null && lon != null) {
-        setFormData(prev => ({
-          ...prev,
-          latitude: prev.latitude || lat.toString(),
-          longitude: prev.longitude || lon.toString(),
-        }))
-      }
-    }
-  }, [showBuoyMap, createdRegattaId])
-
+  // Filter application
   useEffect(() => {
     let filtered = regattas
 
@@ -150,69 +153,6 @@ export function RegattasPage() {
     }
   }
 
-  const handleCreate = async () => {
-    try {
-      const token = localStorage.getItem('access_token')
-      
-      // Prepare payload with proper coordinate conversion
-      const payload: any = { ...formData }
-      if (formData.latitude) {
-        payload.latitude = parseFloat(formData.latitude)
-      }
-      if (formData.longitude) {
-        payload.longitude = parseFloat(formData.longitude)
-      }
-      
-      const response = await axios.post(`${API_BASE_URL}/regattas`, payload, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      
-      // Store the created regatta ID and show buoy map
-      setCreatedRegattaId(response.data.regatta?.id || response.data.id)
-      setShowCreateModal(false)
-      setShowBuoyMap(true)
-      
-      // Reset form but keep coordinates if provided
-      setFormData({
-        name: '', code: '', organizer_id: '', start_date: '', end_date: '',
-        latitude: formData.latitude || '', longitude: formData.longitude || '',
-        scoring_class: 'ORC', status: 'planning',
-      })
-      
-      fetchRegattas()
-    } catch (error: any) {
-      console.error('Failed to create regatta:', error)
-      alert(error.response?.data?.detail || 'Failed to create regatta')
-    }
-  }
-
-  const handleUpdate = async () => {
-    if (!editingRegatta) return
-    try {
-      const token = localStorage.getItem('access_token')
-      
-      // Prepare payload with proper coordinate conversion
-      const payload: any = { ...formData }
-      if (formData.latitude) {
-        payload.latitude = parseFloat(formData.latitude)
-      }
-      if (formData.longitude) {
-        payload.longitude = parseFloat(formData.longitude)
-      }
-      
-      await axios.put(`${API_BASE_URL}/regattas/${editingRegatta.id}`, payload, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      
-      setEditingRegatta(null)
-      fetchRegattas()
-    } catch (error: any) {
-      console.error('Failed to update regatta:', error)
-      alert(error.response?.data?.detail || 'Failed to update regatta')
-    }
-  }
-
-  // Fetch buoys for a regatta
   const fetchBuoys = async (regattaId: string) => {
     try {
       const response = await axios.get(`${API_BASE_URL}/regattas/${regattaId}/marks`)
@@ -222,55 +162,75 @@ export function RegattasPage() {
     }
   }
 
-  // Handle buoy save from BuoyMapManager
-  const handleBuoySave = async (savedBuoys: Buoy[]) => {
-    setBuoys(savedBuoys)
-    // Also update parent state if needed
-    if (onBuoySave) {
-      onBuoySave(savedBuoys)
+  const fetchEntries = async (regatta: Regatta) => {
+    try {
+      setSelectedRegattaForEntries(regatta)
+      setEntriesLoading(true)
+      const response = await axios.get(`${API_BASE_URL}/registrations/regatta/${regatta.id}/entries`)
+      setEntries(response.data.entries || [])
+    } catch (error) {
+      console.error('Failed to fetch entries:', error)
+      setEntries([])
+    } finally {
+      setEntriesLoading(false)
     }
   }
 
-  // Callback for buoy changes from child components
-  const onBuoySave: ((buoys: Buoy[]) => void) | undefined = undefined
+  const handleCreate = async () => {
+    try {
+      const token = localStorage.getItem('access_token') || localStorage.getItem('token')
+      const payload: any = { ...formData }
+      if (formData.latitude) payload.latitude = parseFloat(formData.latitude)
+      if (formData.longitude) payload.longitude = parseFloat(formData.longitude)
 
-  // Open regatta and show buoy map (for both new and existing regattas)
-  const openRegattaWithMap = async (regatta: Regatta) => {
-    setEditingRegatta(regatta)
-    // Set createdRegattaId so BuoyMapManager shows the correct regatta
-    setCreatedRegattaId(regatta.id)
-    setFormData({
-      name: regatta.name,
-      code: regatta.code,
-      organizer_id: regatta.organizer_id || '',
-      start_date: regatta.start_date.split('T')[0],
-      end_date: regatta.end_date.split('T')[0],
-      latitude: regatta.latitude?.toString() || '',
-      longitude: regatta.longitude?.toString() || '',
-      scoring_class: regatta.scoring_class,
-      status: regatta.status,
-    })
-    // Fetch buoys first before showing map
-    await fetchBuoys(regatta.id)
+      const response = await axios.post(`${API_BASE_URL}/regattas`, payload, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+
+      const newRegatta = response.data.regatta || response.data
+      setShowCreateModal(false)
+      setFormData({
+        name: '', code: '', organizer_id: '', start_date: '', end_date: '',
+        latitude: '', longitude: '', scoring_class: 'ORC', status: 'planning',
+      })
+      await fetchRegattas()
+
+      if (newRegatta?.id) {
+        openCourseMap(newRegatta)
+      }
+    } catch (error: any) {
+      alert(error.response?.data?.detail || 'Failed to create regatta')
+    }
   }
 
-  // Close buoy map and return to list
-  const closeBuoyMap = () => {
-    setShowBuoyMap(false)
-    setCreatedRegattaId(null)
-    setEditingRegatta(null)
+  const handleUpdate = async () => {
+    if (!editingRegatta) return
+    try {
+      const token = localStorage.getItem('access_token') || localStorage.getItem('token')
+      const payload: any = { ...formData }
+      if (formData.latitude) payload.latitude = parseFloat(formData.latitude)
+      if (formData.longitude) payload.longitude = parseFloat(formData.longitude)
+
+      await axios.put(`${API_BASE_URL}/regattas/${editingRegatta.id}`, payload, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+
+      setEditingRegatta(null)
+      fetchRegattas()
+    } catch (error: any) {
+      alert(error.response?.data?.detail || 'Failed to update regatta')
+    }
   }
 
   const handleDelete = async (id: string) => {
     if (!confirm('Are you sure you want to delete this regatta?')) return
     try {
-      const token = localStorage.getItem('access_token')
+      const token = localStorage.getItem('access_token') || localStorage.getItem('token')
       await axios.delete(`${API_BASE_URL}/regattas/${id}`, {
         headers: { Authorization: `Bearer ${token}` },
       })
       fetchRegattas()
     } catch (error: any) {
-      console.error('Failed to delete regatta:', error)
       alert(error.response?.data?.detail || 'Failed to delete regatta')
     }
   }
@@ -288,6 +248,16 @@ export function RegattasPage() {
       scoring_class: regatta.scoring_class,
       status: regatta.status,
     })
+  }
+
+  const openCourseMap = async (regatta: Regatta) => {
+    setActiveMapRegatta(regatta)
+    await fetchBuoys(regatta.id)
+  }
+
+  const closeCourseMap = () => {
+    setActiveMapRegatta(null)
+    fetchRegattas()
   }
 
   const getStatusBadge = (status: string) => {
@@ -311,106 +281,76 @@ export function RegattasPage() {
 
   return (
     <div className="min-h-screen py-8">
-      {/* Background overlay */}
+      {/* Background */}
       <div
-        className="fixed inset-0 bg-cover bg-center bg-no-repeat"
+        className="fixed inset-0 bg-cover bg-center bg-no-repeat -z-10"
         style={{ backgroundImage: `url(${backgroundImg})` }}
       >
         <div className="absolute inset-0 bg-gradient-to-br from-blue-900/92 via-blue-800/88 to-cyan-700/85"></div>
       </div>
 
-      {/* Content */}
       <div className="relative z-10 container mx-auto px-4 max-w-7xl">
-        {(showBuoyMap || editingRegatta) && createdRegattaId ? (
-          // Buoy Map View - Full screen map for buoy placement
+        {/* ========================================================================= */}
+        {/* RACE COURSE MAP VIEW                                                      */}
+        {/* ========================================================================= */}
+        {activeMapRegatta ? (
           <div className="mt-4">
-            {/* Map Header */}
             <div className="flex justify-between items-center mb-4">
               <div>
                 <h1 className="text-2xl font-bold text-white flex items-center gap-3">
                   🗺️ Place Race Course Marks
                 </h1>
-                <p className="text-blue-200 mt-1">Click on the map to place buoys for regatta: {editingRegatta?.name || 'New Regatta'}</p>
+                <p className="text-blue-200 mt-1">Regatta: {activeMapRegatta.name}</p>
               </div>
-              <div className="flex gap-3">
-                <button
-                  onClick={closeBuoyMap}
-                  className="px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-sm hover:bg-white/15 transition-colors text-white"
-                >
-                  ← Back to Regattas
-                </button>
-              </div>
+              <button
+                onClick={closeCourseMap}
+                className="px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-sm hover:bg-white/15 text-white transition-colors"
+              >
+                ← Back to Regattas
+              </button>
             </div>
 
-            {/* Buoy count summary */}
-            <div className="bg-white/10 backdrop-blur-sm rounded-xl shadow-sm border border-white/20 p-3 mb-4 flex gap-6">
-              {(['windward', 'leeward', 'gate_left', 'gate_right', 'finish'] as const).map((type) => (
-                <div key={type} className="flex items-center gap-2 text-sm">
-                  <div
-                    className="w-3 h-3 rounded-full"
-                    style={{ backgroundColor: {
-                      windward: '#ef4444',
-                      leeward: '#3b82f6',
-                      gate_left: '#10b981',
-                      gate_right: '#f59e0b',
-                      finish: '#8b5cf6',
-                    }[type] }}
-                  />
-                  <span className="text-blue-200 capitalize">{type.replace('_', ' ')}</span>
-                  <span className="font-semibold text-white">
-                    {buoys.filter(b => b.mark_type === type).length}
-                  </span>
-                </div>
-              ))}
-            </div>
-
-            {/* Map Component */}
-            <div className="h-[calc(100vh-280px)] min-h-[600px]">
+            {/* Leaflet Map */}
+            <div className="h-[calc(100vh-340px)] min-h-[550px] rounded-xl overflow-hidden shadow-lg border border-white/10">
               <BuoyMapManager
-                regattaId={createdRegattaId}
-                centerLat={parseFloat(formData.latitude) || (editingRegatta?.latitude ?? DEFAULT_CENTER_LAT)}
-                centerLon={parseFloat(formData.longitude) || (editingRegatta?.longitude ?? DEFAULT_CENTER_LON)}
+                regattaId={activeMapRegatta.id}
+                centerLat={activeMapRegatta.latitude ?? DEFAULT_CENTER_LAT}
+                centerLon={activeMapRegatta.longitude ?? DEFAULT_CENTER_LON}
                 zoom={14}
                 initialBuoys={buoys}
-                onSave={handleBuoySave}
+                onSave={(b) => setBuoys(b)}
               />
             </div>
 
-            {/* Quick actions below map */}
-            <div className="flex justify-center gap-4 mt-4">
+            {/* Centered Large Confirm Button */}
+            <div className="mt-8 mb-6 flex justify-center">
               <button
-                onClick={async () => {
-                  // Save any pending buoy changes before closing
-                  if (createdRegattaId) {
-                    await fetchBuoys(createdRegattaId)
-                  }
-                  closeBuoyMap()
-                }}
-                className="px-6 py-2 bg-cyan-500 hover:bg-cyan-600 text-white rounded-lg font-medium transition-colors"
+                type="button"
+                onClick={closeCourseMap}
+                className="px-8 py-3.5 bg-white/10 border border-white/20 text-blue-100 hover:bg-white/20 rounded-xl text-base font-semibold transition-all shadow-lg flex items-center gap-2 backdrop-blur-sm"
               >
-                ✓ Done Placing Buoys
+                Confirm Marks Placement ✓
               </button>
             </div>
           </div>
         ) : (
-          // Regular Regatta List View
+          /* ========================================================================= */
+          /* MAIN REGATTAS LIST VIEW                                                   */
+          /* ========================================================================= */
           <div>
-            {/* Header */}
-            <header className="mb-8">
-              <div className="flex justify-between items-start">
-                <div>
-                  <h1 className="text-3xl font-bold text-white flex items-center gap-3">
-                    🏁 Regatta Management
-                  </h1>
-                  <p className="text-blue-200 mt-2">Create, manage and monitor sailing regattas</p>
-                </div>
-                <Link to="/dashboard" className="px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-sm hover:bg-white/15 transition-colors">
-                  ← Back to Dashboard
-                </Link>
+            <header className="mb-8 flex justify-between items-start">
+              <div>
+                <h1 className="text-3xl font-bold text-white flex items-center gap-3">
+                  🏁 Regatta Management
+                </h1>
+                <p className="text-blue-200 mt-2">Create, manage and monitor sailing regattas</p>
               </div>
+              <Link to="/dashboard" className="px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-sm text-white hover:bg-white/15 transition-colors">
+                ← Back to Dashboard
+              </Link>
             </header>
 
-            {/* Filters */}
+            {/* FILTER BAR */}
             <div className="bg-white/10 backdrop-blur-sm rounded-xl shadow-sm border border-white/20 p-4 mb-6">
               <div className="flex flex-wrap gap-4 items-center">
                 <input
@@ -418,13 +358,13 @@ export function RegattasPage() {
                   placeholder="Search regattas..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="px-3 py-1.5 border border-white/20 bg-white/10 rounded-lg text-sm focus:ring-2 focus:ring-cyan-400 text-blue-100 placeholder-blue-300"
+                  className="px-3 py-1.5 border border-white/20 bg-white/10 rounded-lg text-sm focus:ring-2 focus:ring-cyan-400 text-blue-100 placeholder-blue-300 outline-none"
                 />
 
                 <select
                   value={statusFilter}
                   onChange={(e) => setStatusFilter(e.target.value)}
-                  className="px-3 py-1.5 border border-white/20 bg-white/10 rounded-lg text-sm focus:ring-2 focus:ring-cyan-400 text-blue-100"
+                  className="px-3 py-1.5 border border-white/20 bg-white/10 rounded-lg text-sm focus:ring-2 focus:ring-cyan-400 text-blue-100 outline-none cursor-pointer [&>option]:bg-slate-800 [&>option]:text-white"
                 >
                   <option value="all">All Status</option>
                   <option value="planning">Planning</option>
@@ -437,7 +377,7 @@ export function RegattasPage() {
                 <select
                   value={clubFilter}
                   onChange={(e) => setClubFilter(e.target.value)}
-                  className="px-3 py-1.5 border border-white/20 bg-white/10 rounded-lg text-sm focus:ring-2 focus:ring-cyan-400 text-blue-100"
+                  className="px-3 py-1.5 border border-white/20 bg-white/10 rounded-lg text-sm focus:ring-2 focus:ring-cyan-400 text-blue-100 outline-none cursor-pointer [&>option]:bg-slate-800 [&>option]:text-white"
                 >
                   <option value="all">All Clubs</option>
                   {clubs.map((club) => (
@@ -454,126 +394,145 @@ export function RegattasPage() {
               </div>
             </div>
 
-            {/* Regatta List */}
+            {/* Regattas Grid */}
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredRegattas.length === 0 ? (
-                <div className="md:col-span-2 lg:col-span-3 bg-white/10 backdrop-blur-sm rounded-xl shadow-sm border border-white/20 p-12 text-center">
-                  <span className="text-4xl mb-4 block">🏁</span>
-                  <p className="text-blue-200">{searchQuery ? 'No regattas match your search' : 'No regattas found'}</p>
-                </div>
-              ) : (
-                filteredRegattas.map((regatta) => {
-                  const hasMarks = buoys.some(b => b.regatta_id === regatta.id)
-                  
-                  return (
-                    <div key={regatta.id} className="bg-white/10 backdrop-blur-sm rounded-xl shadow-sm border border-white/20 p-6 hover:bg-white/15 transition-colors">
-                      <div className="flex items-start justify-between mb-3">
-                        <h3 className="font-semibold text-lg text-white">{regatta.name}</h3>
-                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium border ${getStatusBadge(regatta.status)}`}>
-                          {regatta.status.toUpperCase()}
-                        </span>
-                      </div>
-
-                      <p className="text-sm text-blue-300 mb-4">Code: {regatta.code}</p>
-
-                      <div className="space-y-2 text-sm text-blue-200 mb-4">
-                        <p>📅 {new Date(regatta.start_date).toLocaleDateString()} - {new Date(regatta.end_date).toLocaleDateString()}</p>
-                        <p>⛵ Scoring: {regatta.scoring_class}</p>
-                        {hasMarks && (
-                          <p className="text-xs text-green-300">✓ Marks placed</p>
-                        )}
-                        {regatta.organizer_id && (
-                          <p className="text-xs text-blue-300">Organizer ID: {regatta.organizer_id}</p>
-                        )}
-                      </div>
-
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => openRegattaWithMap(regatta)}
-                          className="flex-1 px-3 py-1.5 bg-cyan-500/20 border border-cyan-400/30 text-cyan-300 rounded-lg text-sm hover:bg-cyan-500/30 transition-colors"
-                        >
-                          🗺️ Course Map
-                        </button>
-                        <button onClick={() => handleDelete(regatta.id)} className="px-3 py-1.5 bg-red-500/20 border border-red-400/30 text-red-300 rounded-lg text-sm hover:bg-red-500/30 transition-colors">
-                          Delete
-                        </button>
-                      </div>
+              {filteredRegattas.map((regatta) => (
+                <div key={regatta.id} className="bg-white/10 backdrop-blur-sm rounded-xl border border-white/20 p-6 flex flex-col justify-between hover:bg-white/15 transition-colors">
+                  <div>
+                    <div className="flex items-start justify-between mb-2">
+                      <h3 className="font-semibold text-lg text-white">{regatta.name}</h3>
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium border ${getStatusBadge(regatta.status)}`}>
+                        {regatta.status.toUpperCase()}
+                      </span>
                     </div>
-                  )
-                })
-              )}
-            </div>
-          </div>
-        )}
+                    <p className="text-sm text-blue-300 mb-3">Code: {regatta.code}</p>
+                    <p className="text-xs text-blue-200 mb-4">
+                      📅 {new Date(regatta.start_date).toLocaleDateString()} - {new Date(regatta.end_date).toLocaleDateString()}
+                    </p>
+                  </div>
 
-        {/* Create Modal */}
-        {showCreateModal && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-slate-800 rounded-xl shadow-xl border border-slate-700 w-full max-w-lg p-6">
-              <h2 className="text-xl font-bold text-white mb-4">Create New Regatta</h2>
+                  {/* Card Action Buttons */}
+                  <div className="space-y-2 pt-4 border-t border-white/10">
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => navigate(`/regattas/${regatta.id}/register`)}
+                        className="flex-1 px-3 py-1.5 bg-emerald-500/20 border border-emerald-400/30 text-emerald-300 hover:bg-emerald-500/30 rounded-lg text-xs font-semibold transition-colors"
+                      >
+                        ⛵ Register
+                      </button>
 
-              <div className="space-y-3">
-                <input type="text" placeholder="Name" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:ring-2 focus:ring-cyan-400" />
-                <input type="text" placeholder="Code" value={formData.code} onChange={(e) => setFormData({ ...formData, code: e.target.value })} className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:ring-2 focus:ring-cyan-400" />
-                <select value={formData.organizer_id} onChange={(e) => setFormData({ ...formData, organizer_id: e.target.value })} className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:ring-2 focus:ring-cyan-400">
-                  <option value="">Select a Club (Organizer)</option>
-                  {clubs.map((club) => (
-                    <option key={club.id} value={club.id}>{club.name}</option>
-                  ))}
-                </select>
-                <input type="date" value={formData.start_date} onChange={(e) => setFormData({ ...formData, start_date: e.target.value })} className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:ring-2 focus:ring-cyan-400" />
-                <input type="date" value={formData.end_date} onChange={(e) => setFormData({ ...formData, end_date: e.target.value })} className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:ring-2 focus:ring-cyan-400" />
-                <div className="grid grid-cols-2 gap-3">
-                  <input type="text" placeholder="Latitude" value={formData.latitude} onChange={(e) => setFormData({ ...formData, latitude: e.target.value })} className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:ring-2 focus:ring-cyan-400" />
-                  <input type="text" placeholder="Longitude" value={formData.longitude} onChange={(e) => setFormData({ ...formData, longitude: e.target.value })} className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:ring-2 focus:ring-cyan-400" />
+                      <button
+                        onClick={() => fetchEntries(regatta)}
+                        className="flex-1 px-3 py-1.5 bg-amber-500/20 border border-amber-400/30 text-amber-300 hover:bg-amber-500/30 rounded-lg text-xs font-semibold transition-colors"
+                      >
+                        👥 Entries
+                      </button>
+                    </div>
+
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => openCourseMap(regatta)}
+                        className="flex-1 px-3 py-1.5 bg-cyan-500/20 border border-cyan-400/30 text-cyan-300 hover:bg-cyan-500/30 rounded-lg text-xs transition-colors"
+                      >
+                        🗺️ Course Map
+                      </button>
+
+                      <button
+                        onClick={() => openEdit(regatta)}
+                        className="px-3 py-1.5 bg-white/10 border border-white/20 text-blue-100 hover:bg-white/20 rounded-lg text-xs transition-colors"
+                      >
+                        Edit
+                      </button>
+
+                      <button
+                        onClick={() => handleDelete(regatta.id)}
+                        className="px-3 py-1.5 bg-red-500/20 border border-red-400/30 text-red-300 hover:bg-red-500/30 rounded-lg text-xs transition-colors"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
                 </div>
-                <select value={formData.scoring_class} onChange={(e) => setFormData({ ...formData, scoring_class: e.target.value })} className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:ring-2 focus:ring-cyan-400">
-                  <option value="ORC">ORC</option>
-                  <option value="IRC">IRC</option>
-                  <option value="PHRF">PHRF</option>
-                </select>
-                <select value={formData.status} onChange={(e) => setFormData({ ...formData, status: e.target.value })} className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:ring-2 focus:ring-cyan-400">
-                  <option value="planning">Planning</option>
-                  <option value="open">Open</option>
-                  <option value="closed">Closed</option>
-                </select>
-              </div>
-
-              <div className="flex gap-3 mt-6">
-                <button onClick={() => setShowCreateModal(false)} className="flex-1 px-4 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-600 transition-colors">Cancel</button>
-                <button onClick={handleCreate} className="flex-1 px-4 py-2 bg-cyan-500 text-white rounded-lg hover:bg-cyan-600 transition-colors">Create & Place Marks</button>
-              </div>
+              ))}
             </div>
           </div>
         )}
 
-        {/* Edit Modal - Only shown when NOT in buoy map mode */}
-        {editingRegatta && !showBuoyMap && !createdRegattaId && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-slate-800 rounded-xl shadow-xl border border-slate-700 w-full max-w-lg p-6">
+        {/* ========================================================================= */}
+        {/* MODAL: EDIT REGATTA                                                       */}
+        {/* ========================================================================= */}
+        {editingRegatta && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-slate-900/90 backdrop-blur-md rounded-2xl shadow-2xl border border-white/20 w-full max-w-lg p-6">
               <h2 className="text-xl font-bold text-white mb-4">Edit Regatta</h2>
 
               <div className="space-y-3">
-                <input type="text" placeholder="Name" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:ring-2 focus:ring-cyan-400" />
-                <input type="text" placeholder="Code" value={formData.code} onChange={(e) => setFormData({ ...formData, code: e.target.value })} className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:ring-2 focus:ring-cyan-400" />
-                <select value={formData.organizer_id} onChange={(e) => setFormData({ ...formData, organizer_id: e.target.value })} className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:ring-2 focus:ring-cyan-400">
+                <input
+                  type="text"
+                  placeholder="Name"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  className="w-full px-3 py-2 border border-white/20 bg-white/10 rounded-lg text-sm focus:ring-2 focus:ring-cyan-400 text-blue-100 placeholder-blue-300 outline-none"
+                />
+                <input
+                  type="text"
+                  placeholder="Code"
+                  value={formData.code}
+                  onChange={(e) => setFormData({ ...formData, code: e.target.value })}
+                  className="w-full px-3 py-2 border border-white/20 bg-white/10 rounded-lg text-sm focus:ring-2 focus:ring-cyan-400 text-blue-100 placeholder-blue-300 outline-none"
+                />
+                <select
+                  value={formData.organizer_id}
+                  onChange={(e) => setFormData({ ...formData, organizer_id: e.target.value })}
+                  className="w-full px-3 py-2 border border-white/20 bg-white/10 rounded-lg text-sm focus:ring-2 focus:ring-cyan-400 text-blue-100 outline-none cursor-pointer [&>option]:bg-slate-800 [&>option]:text-white"
+                >
                   <option value="">Select a Club (Organizer)</option>
                   {clubs.map((club) => (
                     <option key={club.id} value={club.id}>{club.name}</option>
                   ))}
                 </select>
-                <input type="date" value={formData.start_date} onChange={(e) => setFormData({ ...formData, start_date: e.target.value })} className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:ring-2 focus:ring-cyan-400" />
-                <input type="date" value={formData.end_date} onChange={(e) => setFormData({ ...formData, end_date: e.target.value })} className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:ring-2 focus:ring-cyan-400" />
+                <input
+                  type="date"
+                  value={formData.start_date}
+                  onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
+                  className="w-full px-3 py-2 border border-white/20 bg-white/10 rounded-lg text-sm focus:ring-2 focus:ring-cyan-400 text-blue-100 outline-none"
+                />
+                <input
+                  type="date"
+                  value={formData.end_date}
+                  onChange={(e) => setFormData({ ...formData, end_date: e.target.value })}
+                  className="w-full px-3 py-2 border border-white/20 bg-white/10 rounded-lg text-sm focus:ring-2 focus:ring-cyan-400 text-blue-100 outline-none"
+                />
                 <div className="grid grid-cols-2 gap-3">
-                  <input type="text" placeholder="Latitude" value={formData.latitude} onChange={(e) => setFormData({ ...formData, latitude: e.target.value })} className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:ring-2 focus:ring-cyan-400" />
-                  <input type="text" placeholder="Longitude" value={formData.longitude} onChange={(e) => setFormData({ ...formData, longitude: e.target.value })} className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:ring-2 focus:ring-cyan-400" />
+                  <input
+                    type="text"
+                    placeholder="Latitude"
+                    value={formData.latitude}
+                    onChange={(e) => setFormData({ ...formData, latitude: e.target.value })}
+                    className="w-full px-3 py-2 border border-white/20 bg-white/10 rounded-lg text-sm focus:ring-2 focus:ring-cyan-400 text-blue-100 placeholder-blue-300 outline-none"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Longitude"
+                    value={formData.longitude}
+                    onChange={(e) => setFormData({ ...formData, longitude: e.target.value })}
+                    className="w-full px-3 py-2 border border-white/20 bg-white/10 rounded-lg text-sm focus:ring-2 focus:ring-cyan-400 text-blue-100 placeholder-blue-300 outline-none"
+                  />
                 </div>
-                <select value={formData.scoring_class} onChange={(e) => setFormData({ ...formData, scoring_class: e.target.value })} className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:ring-2 focus:ring-cyan-400">
+                <select
+                  value={formData.scoring_class}
+                  onChange={(e) => setFormData({ ...formData, scoring_class: e.target.value })}
+                  className="w-full px-3 py-2 border border-white/20 bg-white/10 rounded-lg text-sm focus:ring-2 focus:ring-cyan-400 text-blue-100 outline-none cursor-pointer [&>option]:bg-slate-800 [&>option]:text-white"
+                >
                   <option value="ORC">ORC</option>
                   <option value="IRC">IRC</option>
                   <option value="PHRF">PHRF</option>
                 </select>
-                <select value={formData.status} onChange={(e) => setFormData({ ...formData, status: e.target.value })} className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:ring-2 focus:ring-cyan-400">
+                <select
+                  value={formData.status}
+                  onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                  className="w-full px-3 py-2 border border-white/20 bg-white/10 rounded-lg text-sm focus:ring-2 focus:ring-cyan-400 text-blue-100 outline-none cursor-pointer [&>option]:bg-slate-800 [&>option]:text-white"
+                >
                   <option value="planning">Planning</option>
                   <option value="open">Open</option>
                   <option value="closed">Closed</option>
@@ -583,8 +542,215 @@ export function RegattasPage() {
               </div>
 
               <div className="flex gap-3 mt-6">
-                <button onClick={() => { setEditingRegatta(null); setCreatedRegattaId(null) }} className="flex-1 px-4 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-600 transition-colors">Cancel</button>
-                <button onClick={async () => { await handleUpdate(); closeBuoyMap() }} className="flex-1 px-4 py-2 bg-cyan-500 text-white rounded-lg hover:bg-cyan-600 transition-colors">Save Changes</button>
+                <button
+                  type="button"
+                  onClick={() => setEditingRegatta(null)}
+                  className="flex-1 px-4 py-2 bg-white/10 border border-white/20 text-blue-100 hover:bg-white/20 rounded-lg text-sm transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleUpdate}
+                  className="flex-1 px-4 py-2 bg-cyan-500 hover:bg-cyan-600 text-white rounded-lg text-sm font-medium transition-colors"
+                >
+                  Save Changes
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* MODAL: CREATE REGATTA                                                     */}
+        {/* ========================================================================= */}
+        {showCreateModal && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-slate-900/90 backdrop-blur-md rounded-2xl shadow-2xl border border-white/20 w-full max-w-lg p-6">
+              <h2 className="text-xl font-bold text-white mb-4">Create New Regatta</h2>
+
+              <div className="space-y-3">
+                <input
+                  type="text"
+                  placeholder="Name"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  className="w-full px-3 py-2 border border-white/20 bg-white/10 rounded-lg text-sm focus:ring-2 focus:ring-cyan-400 text-blue-100 placeholder-blue-300 outline-none"
+                />
+                <input
+                  type="text"
+                  placeholder="Code"
+                  value={formData.code}
+                  onChange={(e) => setFormData({ ...formData, code: e.target.value })}
+                  className="w-full px-3 py-2 border border-white/20 bg-white/10 rounded-lg text-sm focus:ring-2 focus:ring-cyan-400 text-blue-100 placeholder-blue-300 outline-none"
+                />
+                <select
+                  value={formData.organizer_id}
+                  onChange={(e) => setFormData({ ...formData, organizer_id: e.target.value })}
+                  className="w-full px-3 py-2 border border-white/20 bg-white/10 rounded-lg text-sm focus:ring-2 focus:ring-cyan-400 text-blue-100 outline-none cursor-pointer [&>option]:bg-slate-800 [&>option]:text-white"
+                >
+                  <option value="">Select a Club (Organizer)</option>
+                  {clubs.map((club) => (
+                    <option key={club.id} value={club.id}>{club.name}</option>
+                  ))}
+                </select>
+                <input
+                  type="date"
+                  value={formData.start_date}
+                  onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
+                  className="w-full px-3 py-2 border border-white/20 bg-white/10 rounded-lg text-sm focus:ring-2 focus:ring-cyan-400 text-blue-100 outline-none"
+                />
+                <input
+                  type="date"
+                  value={formData.end_date}
+                  onChange={(e) => setFormData({ ...formData, end_date: e.target.value })}
+                  className="w-full px-3 py-2 border border-white/20 bg-white/10 rounded-lg text-sm focus:ring-2 focus:ring-cyan-400 text-blue-100 outline-none"
+                />
+                <div className="grid grid-cols-2 gap-3">
+                  <input
+                    type="text"
+                    placeholder="Latitude"
+                    value={formData.latitude}
+                    onChange={(e) => setFormData({ ...formData, latitude: e.target.value })}
+                    className="w-full px-3 py-2 border border-white/20 bg-white/10 rounded-lg text-sm focus:ring-2 focus:ring-cyan-400 text-blue-100 placeholder-blue-300 outline-none"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Longitude"
+                    value={formData.longitude}
+                    onChange={(e) => setFormData({ ...formData, longitude: e.target.value })}
+                    className="w-full px-3 py-2 border border-white/20 bg-white/10 rounded-lg text-sm focus:ring-2 focus:ring-cyan-400 text-blue-100 placeholder-blue-300 outline-none"
+                  />
+                </div>
+                <select
+                  value={formData.scoring_class}
+                  onChange={(e) => setFormData({ ...formData, scoring_class: e.target.value })}
+                  className="w-full px-3 py-2 border border-white/20 bg-white/10 rounded-lg text-sm focus:ring-2 focus:ring-cyan-400 text-blue-100 outline-none cursor-pointer [&>option]:bg-slate-800 [&>option]:text-white"
+                >
+                  <option value="ORC">ORC</option>
+                  <option value="IRC">IRC</option>
+                  <option value="PHRF">PHRF</option>
+                </select>
+                <select
+                  value={formData.status}
+                  onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                  className="w-full px-3 py-2 border border-white/20 bg-white/10 rounded-lg text-sm focus:ring-2 focus:ring-cyan-400 text-blue-100 outline-none cursor-pointer [&>option]:bg-slate-800 [&>option]:text-white"
+                >
+                  <option value="planning">Planning</option>
+                  <option value="open">Open</option>
+                  <option value="closed">Closed</option>
+                </select>
+              </div>
+
+              <div className="flex gap-3 mt-6">
+                <button
+                  type="button"
+                  onClick={() => setShowCreateModal(false)}
+                  className="flex-1 px-4 py-2 bg-white/10 border border-white/20 text-blue-100 hover:bg-white/20 rounded-lg text-sm transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCreate}
+                  className="flex-1 px-4 py-2 bg-cyan-500 hover:bg-cyan-600 text-white rounded-lg text-sm font-medium transition-colors"
+                >
+                  Create & Place Marks
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* MODAL: REGISTERED BOATS & CREWS VIEW (GLASSMORPHISM UNIFORMATO)           */}
+        {/* ========================================================================= */}
+        {selectedRegattaForEntries && (
+          <div className="fixed inset-0 bg-blue-950/40 backdrop-blur-md flex items-center justify-center z-50 p-4">
+            <div className="bg-white/10 backdrop-blur-xl rounded-2xl shadow-2xl border border-white/20 w-full max-w-3xl overflow-hidden flex flex-col max-h-[85vh]">
+              {/* Modal Header */}
+              <div className="p-5 border-b border-white/15 flex justify-between items-center bg-white/5">
+                <div>
+                  <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                    ⛵ Registered Boats & Crews
+                  </h2>
+                  <p className="text-xs text-blue-200 mt-0.5">{selectedRegattaForEntries.name}</p>
+                </div>
+                <button
+                  onClick={() => setSelectedRegattaForEntries(null)}
+                  className="px-3 py-1.5 bg-white/10 border border-white/20 text-blue-100 hover:bg-white/20 rounded-lg text-xs font-medium transition-colors"
+                >
+                  ✕ Close
+                </button>
+              </div>
+
+              {/* Modal Body */}
+              <div className="p-6 overflow-y-auto flex-1 space-y-4">
+                {entriesLoading ? (
+                  <div className="text-center py-12">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-400 mx-auto"></div>
+                    <p className="text-sm text-blue-200 mt-3">Loading entries...</p>
+                  </div>
+                ) : entries.length === 0 ? (
+                  <div className="bg-white/5 backdrop-blur-sm rounded-xl border border-white/15 p-12 text-center text-blue-200">
+                    <span className="text-4xl block mb-3">⚓</span>
+                    <p className="text-base font-semibold text-white">No entries found</p>
+                    <p className="text-xs text-blue-300 mt-1">No boats registered for this regatta yet.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {entries.map((entry) => (
+                      <div
+                        key={entry.id}
+                        className="p-5 bg-white/10 backdrop-blur-sm rounded-xl border border-white/20 shadow-sm"
+                      >
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-base font-bold text-cyan-300">{entry.sail_number}</span>
+                              <span className="text-xs px-2 py-0.5 bg-white/10 border border-white/20 text-blue-100 rounded">
+                                {entry.boat_class}
+                              </span>
+                            </div>
+                            <p className="text-xs text-blue-200 mt-1.5">
+                              Skipper / Owner: <b className="text-white font-medium">{entry.skipper_name}</b>
+                            </p>
+                          </div>
+                          <span className="text-xs px-2.5 py-1 rounded-full bg-emerald-500/20 border border-emerald-400/30 text-emerald-300 font-semibold">
+                            {entry.crew_count} on board
+                          </span>
+                        </div>
+
+                        {/* Crew Members List */}
+                        <div className="mt-4 pt-3 border-t border-white/10">
+                          <h4 className="text-xs font-semibold text-blue-300 uppercase tracking-wider mb-2.5">
+                            Crew Members ({entry.crew_members.length}):
+                          </h4>
+                          {entry.crew_members.length === 0 ? (
+                            <p className="text-xs text-blue-200/60 italic">No detailed crew list registered.</p>
+                          ) : (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                              {entry.crew_members.map((c) => (
+                                <div
+                                  key={c.id}
+                                  className="p-2.5 rounded-lg bg-white/5 border border-white/10 flex justify-between items-center text-xs"
+                                >
+                                  <div>
+                                    <p className="font-semibold text-white">{c.name}</p>
+                                    <p className="text-[11px] text-blue-200/70">{c.email}</p>
+                                  </div>
+                                  <span className="px-2 py-0.5 bg-cyan-950 text-cyan-300 border border-cyan-500/30 rounded text-[10px] uppercase font-bold tracking-wider">
+                                    {c.role}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           </div>

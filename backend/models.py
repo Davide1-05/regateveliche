@@ -1,7 +1,7 @@
 """Database models using SQLModel (SQLAlchemy + Pydantic integration)."""
 
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import Optional, List
 import uuid
 import hashlib
 from sqlmodel import SQLModel, Field, Relationship
@@ -139,14 +139,12 @@ class ClubMembership(SQLModel, table=True):
 
 
 # ============================================================================
-# REGISTRATION MODULE (MOD-ADM) - eIDAS Compliant (RF01)
+# REGISTRATION MODULE (MOD-ADM) - eIDAS Compliant (RF01) & CREW MANAGEMENT
 # ============================================================================
 
 class Registration(SQLModel, table=True):
     """
     Smart registration form with eIDAS compliant digital signatures.
-    
-    RF01: Signatures must be eIDAS compliant using SHA-256 hashing and secure storage.
     """
     
     __tablename__ = "registrations"
@@ -160,35 +158,35 @@ class Registration(SQLModel, table=True):
     user_id: uuid.UUID = Field(foreign_key="users.id", index=True)
     
     # Boat information
-    boat_class: str = Field(max_length=100)  # e.g., "Olympic Class", "J/70"
+    boat_class: str = Field(max_length=100)
     hull_number: Optional[str] = Field(max_length=50)
     sail_number: str = Field(max_length=50)
     
     # Crew information
     skipper_name: str = Field(max_length=255)
-    crew_names: Optional[str] = Field(max_length=1000)  # JSON array as string
+    crew_names: Optional[str] = Field(max_length=1000, default=None)  # JSON array as string
     
     # eIDAS Digital Signature (RF01)
     signature_hash: str = Field(
         max_length=64,
         index=True
-    )  # SHA-256 hash of signed document
+    )
     signature_timestamp: Optional[datetime] = None
-    signature_certificate: Optional[str] = Field(max_length=1000)  # Base64 encoded cert
+    signature_certificate: Optional[str] = Field(default=None, max_length=1000)
     
     # Payment status
     registration_fee: float = Field(default=0.0)
     payment_status: str = Field(
         default="pending",
         max_length=20
-    )  # pending, paid, refunded
+    )
     
     # Status
     status: str = Field(
-        default="draft",
+        default="confirmed",
         max_length=20,
         index=True
-    )  # draft, submitted, confirmed, cancelled
+    )
     
     created_at: datetime = Field(
         default_factory=datetime.utcnow,
@@ -200,6 +198,33 @@ class Registration(SQLModel, table=True):
     )
     
     user: User = Relationship(back_populates="registrations")
+    crew_members: list["CrewMember"] = Relationship(
+        back_populates="registration",
+        sa_relationship_kwargs={"cascade": "all, delete-orphan"}
+    )
+
+
+class CrewMember(SQLModel, table=True):
+    """Componente dell'equipaggio associato all'iscrizione di una barca."""
+    
+    __tablename__ = "crew_members"
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True, index=True)
+    registration_id: uuid.UUID = Field(foreign_key="registrations.id", index=True)
+    user_id: Optional[uuid.UUID] = Field(default=None, foreign_key="users.id", nullable=True, index=True)
+    
+    full_name: str = Field(max_length=255)
+    email: str = Field(max_length=255, index=True)
+    phone: Optional[str] = Field(default=None, max_length=50)
+    role: str = Field(default="crew", max_length=50)  # skipper, helm, tactician, trimmer, bowman, crew
+    status: str = Field(default="confirmed", max_length=20)  # invited, confirmed, declined
+
+    created_at: datetime = Field(
+        default_factory=datetime.utcnow,
+        sa_column=Column(DateTime(timezone=True), server_default=func.now())
+    )
+
+    registration: Optional[Registration] = Relationship(back_populates="crew_members")
 
 
 # ============================================================================
@@ -217,7 +242,7 @@ class Regatta(SQLModel, table=True):
         index=True
     )
     name: str = Field(max_length=255)
-    code: str = Field(max_length=10, unique=True)  # Event code for scoring
+    code: str = Field(max_length=10, unique=True)
     
     organizer_id: uuid.UUID = Field(foreign_key="clubs.id", index=True)
     
@@ -225,18 +250,18 @@ class Regatta(SQLModel, table=True):
     start_date: datetime = Field(index=True)
     end_date: datetime = Field(index=True)
     
-    # Location (for telemetry - RF04)
+    # Location
     latitude: float = Field(nullable=True)
     longitude: float = Field(nullable=True)
     
-    # Scoring class (ORC, IRC, etc.)
+    # Scoring class
     scoring_class: str = Field(max_length=50)
     
     # Status
     status: str = Field(
         default="planning",
         max_length=20
-    )  # planning, open, closed, active, completed
+    )
     
     created_at: datetime = Field(
         default_factory=datetime.utcnow,
@@ -259,18 +284,18 @@ class Race(SQLModel, table=True):
     regatta_id: uuid.UUID = Field(foreign_key="regattas.id", index=True)
     race_number: int
     
-    # Race timing (UC3 - Autonomous Start)
+    # Race timing
     scheduled_start: datetime = Field(index=True)
     actual_start: Optional[datetime] = None
     
     # Course definition
-    course_type: str = Field(max_length=50)  # Triangle, Windward-Leeward, etc.
+    course_type: str = Field(max_length=50)
     
     # Status
     status: str = Field(
         default="scheduled",
         max_length=20
-    )  # scheduled, started, finished, scored, cancelled
+    )
     
     created_at: datetime = Field(
         default_factory=datetime.utcnow,
@@ -283,12 +308,7 @@ class Race(SQLModel, table=True):
 # ============================================================================
 
 class TelemetryPoint(SQLModel, table=True):
-    """
-    Real-time telemetry data point from boats.
-    
-    RF04: RTK-level precision (<2cm) with <100ms latency for OCS detection.
-    QA-02: Performance requirement - below 100ms processing.
-    """
+    """Real-time telemetry data point from boats."""
     
     __tablename__ = "telemetry_points"
     
@@ -299,35 +319,24 @@ class TelemetryPoint(SQLModel, table=True):
     registration_id: uuid.UUID = Field(foreign_key="registrations.id", index=True)
     race_id: uuid.UUID = Field(foreign_key="races.id", index=True)
     
-    # RTK GNSS Position (RF04 - <2cm precision)
-    latitude: float = Field(sa_column=Column(String(50)))  # High precision for RTK
+    latitude: float = Field(sa_column=Column(String(50)))
     longitude: float = Field(sa_column=Column(String(50)))
     altitude: float = Field(default=0.0, sa_column=Column(String(50)))
     
-    # Position quality indicators
-    hdop: float = Field(default=0.0)  # Horizontal Dilution of Precision
-    fix_type: str = Field(
-        default="rtk",
-        max_length=20
-    )  # gps, dgps, rtk_float, rtk_fixed
+    hdop: float = Field(default=0.0)
+    fix_type: str = Field(default="rtk", max_length=20)
     
-    # Navigation data (NMEA/SignalK)
     speed_over_ground: float = Field(default=0.0)
     course_over_ground: float = Field(default=0.0)
     heading: Optional[float] = None
     
-    # Timestamp with microsecond precision for <100ms latency tracking
     timestamp: datetime = Field(
         sa_column=Column(DateTime(timezone=True), server_default=func.now(), index=True)
     )
 
 
 class OCSViolation(SQLModel, table=True):
-    """
-    On Course Side violation record (UC3 - Autonomous Start).
-    
-    Automatically detected when boat crosses starting line before T_start.
-    """
+    """On Course Side violation record."""
     
     __tablename__ = "ocs_violations"
     
@@ -338,22 +347,13 @@ class OCSViolation(SQLModel, table=True):
     race_id: uuid.UUID = Field(foreign_key="races.id", index=True)
     registration_id: uuid.UUID = Field(foreign_key="registrations.id", index=True)
     
-    # Violation details
-    violation_time: datetime = Field(
-        sa_type=DateTime(timezone=True)
-    )
+    violation_time: datetime = Field(sa_type=DateTime(timezone=True))
     position_latitude: float
     position_longitude: float
     
-    # Evidence (telemetry point reference)
     evidence_telemetry_id: Optional[uuid.UUID] = None
-    
-    # Resolution
     is_disqualified: bool = Field(default=False)
-    penalty_applied: str = Field(
-        default="none",
-        max_length=20
-    )  # none, time_penalty, disqualification
+    penalty_applied: str = Field(default="none", max_length=20)
 
 
 # ============================================================================
@@ -372,16 +372,11 @@ class RaceResult(SQLModel, table=True):
     race_id: uuid.UUID = Field(foreign_key="races.id", index=True)
     registration_id: uuid.UUID = Field(foreign_key="registrations.id", index=True)
     
-    # Finish data
     finish_time: Optional[datetime] = None
     net_time: Optional[timedelta] = None
-    
-    # Scoring (MOD-SCORE - ORC/IRC support)
     position: Optional[int] = None
     points: Optional[float] = None
-    scoring_code: Optional[str] = Field(max_length=10)  # A, DNF, OCS, etc.
-    
-    # Handicap data (for ORC/IRC)
+    scoring_code: Optional[str] = Field(max_length=10, default=None)
     handicap_rating: Optional[float] = None
     corrected_time: Optional[timedelta] = None
     
@@ -403,12 +398,9 @@ class RegattaStandings(SQLModel, table=True):
     regatta_id: uuid.UUID = Field(foreign_key="regattas.id", index=True)
     registration_id: uuid.UUID = Field(foreign_key="registrations.id", index=True)
     
-    # Aggregated scores
     total_points: float = Field(default=0.0)
-    net_points: float = Field(default=0.0)  # After discards
+    net_points: float = Field(default=0.0)
     races_completed: int = Field(default=0)
-    
-    # Position
     overall_position: Optional[int] = None
     
     last_updated: datetime = Field(
@@ -422,11 +414,7 @@ class RegattaStandings(SQLModel, table=True):
 # ============================================================================
 
 class Protest(SQLModel, table=True):
-    """
-    Protest submission system.
-    
-    UC5: Mobile submission with GPS/video attachments validated against race time limits.
-    """
+    """Protest submission system."""
     
     __tablename__ = "protests"
     
@@ -436,35 +424,25 @@ class Protest(SQLModel, table=True):
         index=True
     )
     regatta_id: uuid.UUID = Field(foreign_key="regattas.id", index=True)
-    race_id: Optional[uuid.UUID] = Field(foreign_key="races.id")
+    race_id: Optional[uuid.UUID] = Field(foreign_key="races.id", default=None)
     
-    # Parties
     protestor_registration_id: uuid.UUID = Field(foreign_key="registrations.id")
     protestee_registration_id: uuid.UUID = Field(foreign_key="registrations.id")
     
-    # Protest details
-    rule_broken: str = Field(max_length=255)  # Racing Rules reference
+    rule_broken: str = Field(max_length=255)
     description: str = Field(max_length=2000)
     
-    # Evidence (UC5 - GPS/video attachments)
     evidence_gps_latitude: Optional[float] = None
     evidence_gps_longitude: Optional[float] = None
     evidence_timestamp: Optional[datetime] = None
-    evidence_video_url: Optional[str] = Field(max_length=500)
+    evidence_video_url: Optional[str] = Field(max_length=500, default=None)
     
-    # Timing validation (UC5 - race time limits)
     submitted_at: datetime = Field(
         default_factory=datetime.utcnow,
         sa_column=Column(DateTime(timezone=True), server_default=func.now())
     )
-    
-    # Status & resolution
-    status: str = Field(
-        default="submitted",
-        max_length=20
-    )  # submitted, under_review, decided, withdrawn
-    
-    decision: Optional[str] = Field(max_length=1000)
+    status: str = Field(default="submitted", max_length=20)
+    decision: Optional[str] = Field(max_length=1000, default=None)
     decided_at: Optional[datetime] = None
     
     created_at: datetime = Field(
@@ -474,16 +452,11 @@ class Protest(SQLModel, table=True):
 
 
 # ============================================================================
-# RACE COURSE MANAGEMENT - STARTSYNC ALGORITHM SUPPORT (3.1 PRD)
+# RACE COURSE MANAGEMENT - STARTSYNC ALGORITHM SUPPORT
 # ============================================================================
 
 class StartLine(SQLModel, table=True):
-    """
-    Starting line definition for OCS detection algorithm.
-    
-    PRD Section 3.1: StartSync Algorithm requires start line defined by two points P1 and P2.
-    Formula: D = ((y₂-y₁)x_b - (x₂-x₁)y_b + x₂y₁ - y₂x₁) / √((y₂-y₁)² + (x₂-x₁)²)
-    """
+    """Starting line definition for OCS detection algorithm."""
     
     __tablename__ = "start_lines"
     
@@ -494,23 +467,13 @@ class StartLine(SQLModel, table=True):
     )
     race_id: uuid.UUID = Field(foreign_key="races.id", index=True)
     
-    # Start line defined by two points (P1 and P2 in PRD formula)
-    p1_latitude: float = Field(sa_column=Column(String(50)))  # Point 1 latitude
-    p1_longitude: float = Field(sa_column=Column(String(50)))  # Point 1 longitude
-    p2_latitude: float = Field(sa_column=Column(String(50)))   # Point 2 latitude
-    p2_longitude: float = Field(sa_column=Column(String(50)))  # Point 2 longitude
+    p1_latitude: float = Field(sa_column=Column(String(50)))
+    p1_longitude: float = Field(sa_column=Column(String(50)))
+    p2_latitude: float = Field(sa_column=Column(String(50)))
+    p2_longitude: float = Field(sa_column=Column(String(50)))
     
-    # Start time (T₀ in PRD formula)
-    start_time: datetime = Field(
-        sa_type=DateTime(timezone=True),
-        index=True
-    )
-    
-    # Line orientation (which side is "on course")
-    on_course_side: str = Field(
-        default="right",
-        max_length=10
-    )  # right or left when facing from P1 to P2
+    start_time: datetime = Field(sa_type=DateTime(timezone=True), index=True)
+    on_course_side: str = Field(default="right", max_length=10)
     
     created_at: datetime = Field(
         default_factory=datetime.utcnow,
@@ -519,12 +482,7 @@ class StartLine(SQLModel, table=True):
 
 
 class Mark(SQLModel, table=True):
-    """
-    Race course mark (buoy).
-    
-    Supports both fixed marks and autonomous robotic buoys (PRD Module 2).
-    IoT integration for bidirectional control of MarkSetBot-style devices.
-    """
+    """Race course mark (buoy)."""
     
     __tablename__ = "marks"
     
@@ -536,18 +494,12 @@ class Mark(SQLModel, table=True):
     regatta_id: uuid.UUID = Field(foreign_key="regattas.id", index=True)
     race_id: Optional[uuid.UUID] = Field(default=None, foreign_key="races.id", index=True, nullable=True)
     
-    # Mark identification
-    mark_letter: str = Field(max_length=5)  # A, B, C, etc. or M1, M2
-    mark_type: str = Field(
-        default="round_up",
-        max_length=20
-    )  # round_up, finish, gate_left, gate_right
+    mark_letter: str = Field(max_length=5)
+    mark_type: str = Field(default="round_up", max_length=20)
     
-    # Position
     latitude: float
     longitude: float
     
-    # Robotic buoy control (PRD Module 2 - IoT Integration)
     is_robotic: bool = Field(default=False)
     device_id: Optional[str] = Field(default=None, max_length=100)
     current_latitude: Optional[float] = None
@@ -567,15 +519,11 @@ def create_signature_hash(content: str) -> str:
 
 
 # ============================================================================
-# FINANCIAL MANAGEMENT & PAYMENT GATEWAY INTEGRATION (MOD-ADM)
+# FINANCIAL MANAGEMENT & PAYMENTS
 # ============================================================================
 
 class PaymentTransaction(SQLModel, table=True):
-    """
-    Payment transaction record with gateway integration.
-    
-    Supports Apple Pay, Google Pay, and traditional card payments via Stripe/PayPal APIs.
-    """
+    """Payment transaction record."""
     
     __tablename__ = "payment_transactions"
     
@@ -584,41 +532,20 @@ class PaymentTransaction(SQLModel, table=True):
         primary_key=True,
         index=True
     )
-    registration_id: Optional[uuid.UUID] = Field(foreign_key="registrations.id", index=True)
+    registration_id: Optional[uuid.UUID] = Field(foreign_key="registrations.id", index=True, default=None)
     user_id: uuid.UUID = Field(foreign_key="users.id", index=True)
     
-    # Payment details
     amount: float = Field()
     currency: str = Field(default="EUR", max_length=3)
-    
-    # Payment method (Apple Pay, Google Pay, Card, Bank Transfer)
-    payment_method: str = Field(
-        default="card",
-        max_length=50
-    )  # apple_pay, google_pay, card, bank_transfer
-    
-    # Gateway reference (Stripe/PayPal transaction ID)
-    gateway_transaction_id: Optional[str] = Field(max_length=255)
-    gateway_provider: Optional[str] = Field(
-        max_length=50
-    )  # stripe, paypal, apple_pay, google_pay
-    
-    # Payment status
-    status: str = Field(
-        default="pending",
-        max_length=20,
-        index=True
-    )  # pending, processing, completed, failed, refunded
-    
-    # Gateway response data (JSON)
-    gateway_response: Optional[str] = Field(max_length=2000)
-    
-    # Refund tracking
+    payment_method: str = Field(default="card", max_length=50)
+    gateway_transaction_id: Optional[str] = Field(max_length=255, default=None)
+    gateway_provider: Optional[str] = Field(max_length=50, default=None)
+    status: str = Field(default="pending", max_length=20, index=True)
+    gateway_response: Optional[str] = Field(max_length=2000, default=None)
     refund_amount: Optional[float] = Field(default=0.0)
-    refund_reason: Optional[str] = Field(max_length=500)
+    refund_reason: Optional[str] = Field(max_length=500, default=None)
     refunded_at: Optional[datetime] = None
     
-    # Timestamps
     transaction_date: datetime = Field(
         default_factory=datetime.utcnow,
         sa_column=Column(DateTime(timezone=True), server_default=func.now())
@@ -631,15 +558,11 @@ class PaymentTransaction(SQLModel, table=True):
 
 
 # ============================================================================
-# OFFICIAL NOTICE BOARD (ONB) - MOD-ADM
+# OFFICIAL NOTICE BOARD (ONB)
 # ============================================================================
 
 class NoticeBoardNotice(SQLModel, table=True):
-    """
-    Official Notice Board system with push notifications.
-    
-    Supports App push, WhatsApp, SMS notifications with read receipts tracking.
-    """
+    """Official Notice Board notice."""
     
     __tablename__ = "notice_board_notices"
     
@@ -648,40 +571,22 @@ class NoticeBoardNotice(SQLModel, table=True):
         primary_key=True,
         index=True
     )
-    regatta_id: Optional[uuid.UUID] = Field(foreign_key="regattas.id", index=True)
+    regatta_id: Optional[uuid.UUID] = Field(foreign_key="regattas.id", index=True, default=None)
     
-    # Notice content
     title: str = Field(max_length=255)
-    content: str = Field(max_length=10000)  # HTML supported
-    notice_type: str = Field(
-        default="general",
-        max_length=50,
-        index=True
-    )  # general, si_amendment, race_change, safety, urgent
-    
-    # Priority (affects notification urgency)
-    priority: str = Field(
-        default="normal",
-        max_length=20
-    )  # low, normal, high, urgent
-    
-    # Publication
+    content: str = Field(max_length=10000)
+    notice_type: str = Field(default="general", max_length=50, index=True)
+    priority: str = Field(default="normal", max_length=20)
     published_by: uuid.UUID = Field(foreign_key="users.id")
     published_at: datetime = Field(
         default_factory=datetime.utcnow,
         sa_column=Column(DateTime(timezone=True), server_default=func.now(), index=True)
     )
-    
-    # Validity period
     valid_from: Optional[datetime] = None
     valid_until: Optional[datetime] = None
-    
-    # Status
     is_active: bool = Field(default=True)
-    is_pinned: bool = Field(default=False)  # Pin to top of ONB
-    
-    # Attachments (SIs, diagrams, etc.)
-    attachment_url: Optional[str] = Field(max_length=500)
+    is_pinned: bool = Field(default=False)
+    attachment_url: Optional[str] = Field(max_length=500, default=None)
     
     created_at: datetime = Field(
         default_factory=datetime.utcnow,
@@ -690,12 +595,7 @@ class NoticeBoardNotice(SQLModel, table=True):
 
 
 class Notification(SQLModel, table=True):
-    """
-    Push notification record with multi-channel support.
-    
-    Channels: App (FCM/APNS), WhatsApp (Twilio), SMS (Twilio)
-    Includes read receipt tracking.
-    """
+    """Push notification record."""
     
     __tablename__ = "notifications"
     
@@ -705,35 +605,17 @@ class Notification(SQLModel, table=True):
         index=True
     )
     user_id: uuid.UUID = Field(foreign_key="users.id", index=True)
-    notice_id: Optional[uuid.UUID] = Field(foreign_key="notice_board_notices.id", index=True)
+    notice_id: Optional[uuid.UUID] = Field(foreign_key="notice_board_notices.id", index=True, default=None)
     
-    # Notification content
     title: str = Field(max_length=255)
     message: str = Field(max_length=1000)
-    
-    # Channel (App, WhatsApp, SMS)
-    channel: str = Field(
-        default="app",
-        max_length=20
-    )  # app, whatsapp, sms
-    
-    # Delivery status
-    status: str = Field(
-        default="pending",
-        max_length=20,
-        index=True
-    )  # pending, sent, delivered, read, failed
-    
-    # Channel-specific tracking
-    device_token: Optional[str] = Field(max_length=500)  # FCM/APNS token
-    phone_number: Optional[str] = Field(max_length=50)  # For WhatsApp/SMS
-    provider_message_id: Optional[str] = Field(max_length=255)  # Twilio/FCM message ID
-    
-    # Read receipt tracking
+    channel: str = Field(default="app", max_length=20)
+    status: str = Field(default="pending", max_length=20, index=True)
+    device_token: Optional[str] = Field(max_length=500, default=None)
+    phone_number: Optional[str] = Field(max_length=50, default=None)
+    provider_message_id: Optional[str] = Field(max_length=255, default=None)
     read_at: Optional[datetime] = None
     delivered_at: Optional[datetime] = None
-    
-    # Retry logic
     retry_count: int = Field(default=0)
     max_retries: int = Field(default=3)
     
@@ -754,23 +636,17 @@ class UserNotificationPreference(SQLModel, table=True):
     )
     user_id: uuid.UUID = Field(foreign_key="users.id", unique=True, index=True)
     
-    # Channel enablement
     app_notifications_enabled: bool = Field(default=True)
     whatsapp_enabled: bool = Field(default=False)
     sms_enabled: bool = Field(default=False)
-    
-    # WhatsApp/SMS phone number
-    notification_phone: Optional[str] = Field(max_length=50)
-    
-    # Quiet hours (no notifications during these times)
-    quiet_hours_start: Optional[int] = Field(default=22)  # 22:00
-    quiet_hours_end: Optional[int] = Field(default=7)  # 07:00
+    notification_phone: Optional[str] = Field(max_length=50, default=None)
+    quiet_hours_start: Optional[int] = Field(default=22)
+    quiet_hours_end: Optional[int] = Field(default=7)
     
     created_at: datetime = Field(
         default_factory=datetime.utcnow,
         sa_column=Column(DateTime(timezone=True), server_default=func.now())
     )
-    
     updated_at: datetime = Field(
         default_factory=datetime.utcnow,
         sa_column=Column(DateTime(timezone=True), server_default=func.now())

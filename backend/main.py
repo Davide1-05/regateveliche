@@ -18,6 +18,7 @@ from backend.auth import (
 from backend.models import (
     User,
     Registration,
+    CrewMember,
     Regatta,
     Race,
     TelemetryPoint,
@@ -56,6 +57,12 @@ class UserCreate(BaseModel):
     password: str
     full_name: Optional[str] = None
 
+class CrewMemberItem(BaseModel):
+    name: str
+    email: str
+    phone: Optional[str] = None
+    role: str = "crew"
+
 class RegistrationCreate(BaseModel):
     regatta_id: uuid.UUID
     boat_class: str
@@ -63,6 +70,7 @@ class RegistrationCreate(BaseModel):
     sail_number: str
     skipper_name: str
     crew_names: Optional[str] = None
+    crew_members: Optional[List[CrewMemberItem]] = []
     signature_hash: str
 
 class RatingLookupRequest(BaseModel):
@@ -160,20 +168,112 @@ def login(user_data: UserCreate, db: Session = Depends(get_db)):
     return {"access_token": token, "token_type": "bearer"}
 
 # ============================================================================
-# REGISTRATION & PAYMENTS
+# REGISTRATION, CREW & PAYMENTS
 # ============================================================================
 
 @app.post("/registrations")
-def create_registration(reg: RegistrationCreate, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def create_registration(
+    reg: RegistrationCreate, 
+    current_user: User = Depends(get_current_user), 
+    db: Session = Depends(get_db)
+):
+    regatta = db.exec(select(Regatta).where(Regatta.id == reg.regatta_id)).first()
+    if not regatta:
+        raise HTTPException(status_code=404, detail="Regatta not found")
+
     new_reg = Registration(
-        **reg.model_dump(),
+        regatta_id=reg.regatta_id,
         user_id=current_user.id,
-        status="submitted"
+        boat_class=reg.boat_class,
+        hull_number=reg.hull_number,
+        sail_number=reg.sail_number,
+        skipper_name=reg.skipper_name,
+        crew_names=reg.crew_names,
+        signature_hash=reg.signature_hash,
+        status="confirmed"
     )
     db.add(new_reg)
     db.commit()
     db.refresh(new_reg)
+
+    if reg.crew_members:
+        for member in reg.crew_members:
+            crew = CrewMember(
+                registration_id=new_reg.id,
+                full_name=member.name,
+                email=member.email,
+                phone=member.phone,
+                role=member.role,
+                status="confirmed"
+            )
+            db.add(crew)
+        db.commit()
+
     return new_reg
+
+@app.get("/registrations/regatta/{regatta_id}/entries")
+def get_regatta_entries(regatta_id: uuid.UUID, db: Session = Depends(get_db)):
+    """Restituisce tutte le barche e relativi equipaggi iscritti a una regata."""
+    registrations = db.exec(
+        select(Registration).where(Registration.regatta_id == regatta_id)
+    ).all()
+
+    entries = []
+    for r in registrations:
+        crew_list = db.exec(
+            select(CrewMember).where(CrewMember.registration_id == r.id)
+        ).all()
+
+        entries.append({
+            "id": str(r.id),
+            "sail_number": r.sail_number,
+            "boat_class": r.boat_class,
+            "hull_number": r.hull_number,
+            "skipper_name": r.skipper_name,
+            "status": r.status,
+            "registered_at": str(r.created_at) if r.created_at else None,
+            "crew_count": len(crew_list),
+            "crew_members": [
+                {
+                    "id": str(c.id),
+                    "name": c.full_name,
+                    "email": c.email,
+                    "phone": c.phone,
+                    "role": c.role,
+                    "status": c.status
+                } for c in crew_list
+            ]
+        })
+
+    return {"entries": entries}
+
+@app.post("/registrations/{registration_id}/crew")
+def add_crew_member_to_registration(
+    registration_id: uuid.UUID,
+    member: CrewMemberItem,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Permette allo skipper responsabile di invitare un membro all'equipaggio."""
+    reg = db.exec(select(Registration).where(Registration.id == registration_id)).first()
+    if not reg:
+        raise HTTPException(status_code=404, detail="Registration not found")
+    
+    if reg.user_id != current_user.id and current_user.role not in ["admin", "race_official"]:
+        raise HTTPException(status_code=403, detail="Permission denied")
+
+    new_crew = CrewMember(
+        registration_id=registration_id,
+        full_name=member.name,
+        email=member.email,
+        phone=member.phone,
+        role=member.role,
+        status="invited"
+    )
+    db.add(new_crew)
+    db.commit()
+    db.refresh(new_crew)
+    return new_crew
 
 @app.post("/payments")
 def process_payment(payment: PaymentRequest, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
@@ -298,7 +398,7 @@ def get_registration_status(registration_id: uuid.UUID, current_user: User = Dep
         raise HTTPException(status_code=404, detail="Registration not found")
     
     import hashlib
-    expected_hash = hashlib.sha256(registration.signature_certificate.encode()).hexdigest()
+    expected_hash = hashlib.sha256((registration.signature_certificate or "").encode()).hexdigest()
     
     return {
         "id": str(registration.id),
@@ -359,7 +459,7 @@ def upload_certificate(
     
     if ext not in allowed_extensions:
         raise HTTPException(
-            status_code=400,
+            status_code=400, 
             detail=f"Invalid file type. Allowed: {', '.join(allowed_extensions)}"
         )
     
@@ -632,9 +732,6 @@ def notify_sms(notice_id: uuid.UUID, current_user: User = Depends(get_current_us
     if current_user.role not in ["club_manager", "admin"]:
         raise HTTPException(status_code=403, detail="Insufficient permissions")
     return {"status": "success", "message": "SMS notification sent"}
-
-def _send_push_notifications(db: Session, notice_id: uuid.UUID, title: str, message: str):
-    pass
 
 # ============================================================================
 # MARK/BUOY MANAGEMENT ENDPOINTS
