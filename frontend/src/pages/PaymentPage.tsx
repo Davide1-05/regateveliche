@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import axios from 'axios'
 import backgroundImg from '../images/background.png'
 import type { Regatta, Registration } from '../types/regatta'
+import LanguageSwitcher from '../components/LanguageSwitcher'
 
 export function PaymentPage() {
   const navigate = useNavigate()
@@ -132,12 +133,16 @@ export function PaymentPage() {
       <div className="relative z-10 container mx-auto px-4 max-w-4xl">
         {/* Header */}
         <header className="mb-8">
-          <button
-            onClick={() => navigate(`/regatta-registration/${regattaId}`)}
-            className="text-cyan-300 hover:text-cyan-200 mb-4 flex items-center gap-2 transition-colors"
-          >
-            ← Back to Registration
-          </button>
+          <div className="flex justify-between items-center mb-4">
+            <button
+              onClick={() => navigate(`/regatta-registration/${regattaId}`)}
+              className="text-cyan-300 hover:text-cyan-200 flex items-center gap-2 transition-colors"
+            >
+              ← Back to Registration
+            </button>
+            {/* Language Switcher */}
+            <LanguageSwitcher />
+          </div>
           
           <div className="bg-white/10 backdrop-blur-md rounded-2xl shadow-lg border border-white/20 p-6">
             <h1 className="text-3xl font-bold text-white mb-2">{regatta?.name}</h1>

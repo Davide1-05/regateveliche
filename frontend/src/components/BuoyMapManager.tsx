@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import { useTranslation } from 'react-i18next';
 
 // Types for buoy/mark management
 interface Buoy {
@@ -96,6 +97,8 @@ const BuoyMapManager: React.FC<BuoyMapManagerProps> = ({
   initialBuoys = [],
   readOnly = false,
 }) => {
+  const { t } = useTranslation();
+  
   const mapRef = useRef<L.Map | null>(null);
   const markersRef = useRef<Map<string, L.Marker>>(new Map());
   const tempMarkerRef = useRef<L.Marker | null>(null);
@@ -206,6 +209,11 @@ const BuoyMapManager: React.FC<BuoyMapManagerProps> = ({
     setSelectedKey(null);
   }, [readOnly, onSave]);
 
+  // Helper to translate buoy type keys
+  const translateBuoyType = (type: string): string => {
+    return t(`buoyMapManager.${type}`);
+  };
+
   // Render Markers & SOLO linea Finish
   useEffect(() => {
     if (!mapRef.current) return;
@@ -226,18 +234,24 @@ const BuoyMapManager: React.FC<BuoyMapManagerProps> = ({
 
       const marker = L.marker([buoy.latitude, buoy.longitude], { icon }).addTo(map);
 
+      // Create a closure to capture the current buoy's values for popup
+      const buoyLetter = buoy.mark_letter;
+      const buoyType = buoy.mark_type;
+      const buoyLat = buoy.latitude.toFixed(5);
+      const buoyLng = buoy.longitude.toFixed(5);
+      
       const popupDiv = document.createElement('div');
       popupDiv.innerHTML = `
         <div style="font-family: sans-serif; font-size: 12px; color: #1e293b;">
-          <b>Boa ${buoy.mark_letter}</b> (${buoy.mark_type})<br/>
-          Lat: ${buoy.latitude.toFixed(5)}<br/>
-          Lng: ${buoy.longitude.toFixed(5)}<br/>
+          <b>${t('buoyMapManager.buoy')} ${buoyLetter}</b> (${translateBuoyType(buoyType)})<br/>
+          ${t('buoyMapManager.latitude')}: ${buoyLat}<br/>
+          ${t('buoyMapManager.longitude')}: ${buoyLng}<br/>
         </div>
       `;
 
       if (!readOnly) {
         const btnDelete = document.createElement('button');
-        btnDelete.innerText = '🗑️ Elimina Boa';
+        btnDelete.innerText = `🗑️ ${t('buoyMapManager.deleteBuoy')}`;
         btnDelete.style.marginTop = '6px';
         btnDelete.style.padding = '4px 8px';
         btnDelete.style.backgroundColor = '#ef4444';
@@ -446,16 +460,16 @@ const BuoyMapManager: React.FC<BuoyMapManagerProps> = ({
       <div className="p-3 bg-slate-700/50 border-b border-slate-600 flex justify-between items-center">
         <div className="flex items-center gap-3">
           <h2 className="text-sm font-semibold text-cyan-400 uppercase tracking-wide">
-            Race Course Marks ({buoys.length})
+            {t('buoyMapManager.title')} ({buoys.length})
           </h2>
           {saveStatus === 'success' && (
             <span className="text-xs text-emerald-400 bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-500/30">
-              ✓ Modifiche salvate
+              ✓ {t('buoyMapManager.changesSaved')}
             </span>
           )}
           {saveStatus === 'error' && (
             <span className="text-xs text-red-400 bg-red-950/60 px-2 py-0.5 rounded border border-red-500/30">
-              ✕ Errore durante il salvataggio
+              ✕ {t('buoyMapManager.saveError')}
             </span>
           )}
         </div>
@@ -473,11 +487,11 @@ const BuoyMapManager: React.FC<BuoyMapManagerProps> = ({
             }`}
           >
             {isSaving ? (
-              <span>Salvataggio...</span>
+              <span>{t('buoyMapManager.saving')}</span>
             ) : saveStatus === 'success' ? (
-              <span>✓ Salvato!</span>
+              <span>✓ {t('buoyMapManager.saved')}</span>
             ) : (
-              <span>💾 Save All</span>
+              <span>💾 {t('buoyMapManager.saveAll')}</span>
             )}
           </button>
         )}
@@ -491,12 +505,12 @@ const BuoyMapManager: React.FC<BuoyMapManagerProps> = ({
 
           {isPlacingMode && (
             <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-cyan-600 text-white px-4 py-2 rounded-lg shadow-lg z-[1000] animate-pulse">
-              <p className="text-sm font-semibold">Clicca sulla mappa per piazzare la boa {placingType}</p>
+              <p className="text-sm font-semibold">{t('buoyMapManager.clickMapToPlaceBuoy', { type: t(`buoyMapManager.${placingType}`) })}</p>
               <button
                 onClick={() => setIsPlacingMode(false)}
                 className="mt-1 text-xs underline hover:text-cyan-200 block text-center w-full"
               >
-                Annulla
+                {t('buoyMapManager.cancel')}
               </button>
             </div>
           )}
@@ -508,7 +522,7 @@ const BuoyMapManager: React.FC<BuoyMapManagerProps> = ({
             {/* Sezione Aggiungi Tipo Boa */}
             <div>
               <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">
-                Aggiungi Tipo Boa
+                {t('buoyMapManager.addBuoyType')}
               </h3>
               <div className="flex flex-col gap-1.5">
                 {(['windward', 'leeward', 'gate_left', 'gate_right', 'finish'] as const).map((type) => (
@@ -526,7 +540,7 @@ const BuoyMapManager: React.FC<BuoyMapManagerProps> = ({
                         className="w-3 h-3 rounded-full"
                         style={{ backgroundColor: BUOY_COLORS[type] }}
                       />
-                      <span className="text-xs text-white capitalize">{type.replace('_', ' ')}</span>
+                      <span className="text-xs text-white">{t(`buoyMapManager.${type}`)}</span>
                     </div>
                     <span className="text-xs text-slate-400">
                       {getBuoyCountByType(type)}
@@ -541,11 +555,11 @@ const BuoyMapManager: React.FC<BuoyMapManagerProps> = ({
             {/* Sezione Elenco Boe Posizionate con Pulsante Elimina */}
             <div className="flex-1 flex flex-col min-h-0">
               <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">
-                Boe Piazzate ({buoys.length})
+                {t('buoyMapManager.placedBuoys')} ({buoys.length})
               </h3>
 
               {buoys.length === 0 ? (
-                <p className="text-xs text-slate-500 italic">Nessuna boa posizionata.</p>
+                <p className="text-xs text-slate-500 italic">{t('buoyMapManager.noBuoysPlaced')}</p>
               ) : (
                 <div className="flex flex-col gap-1.5 overflow-y-auto max-h-60 pr-1">
                   {buoys.map((buoy, idx) => {
@@ -577,8 +591,8 @@ const BuoyMapManager: React.FC<BuoyMapManagerProps> = ({
                           >
                             {buoy.mark_letter}
                           </span>
-                          <span className="text-slate-200 capitalize font-medium">
-                            {buoy.mark_type.replace('_', ' ')}
+                          <span className="text-slate-200 font-medium">
+                            {t(`buoyMapManager.${buoy.mark_type}`)}
                           </span>
                         </div>
 
@@ -588,7 +602,7 @@ const BuoyMapManager: React.FC<BuoyMapManagerProps> = ({
                             e.stopPropagation();
                             deleteBuoy(buoy, idx);
                           }}
-                          title="Elimina questa boa"
+                          title={t('buoyMapManager.deleteBuoy')}
                           className="p-1 hover:bg-red-500/20 text-slate-400 hover:text-red-400 rounded transition-colors"
                         >
                           🗑️

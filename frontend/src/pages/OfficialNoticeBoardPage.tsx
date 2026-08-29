@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import axios from 'axios'
 import backgroundImg from '../images/background.png'
+import LanguageSwitcher from '../components/LanguageSwitcher'
 
 interface Notice {
   id: number
@@ -193,19 +194,23 @@ export function OfficialNoticeBoardPage() {
               </p>
             </div>
 
-            {/* Notification Settings */}
-            <button
-              onClick={requestNotificationPermission}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                notificationPermission === 'granted'
-                  ? 'bg-green-500/20 border border-green-400/30 text-green-300'
-                  : 'bg-cyan-500/20 border border-cyan-400/30 text-cyan-300 hover:bg-cyan-500/30'
-              }`}
-            >
-              {notificationPermission === 'granted'
-                ? '✓ Notifications Enabled'
-                : '🔔 Enable Push Notifications'}
-            </button>
+            {/* Notification Settings and Language Switcher */}
+            <div className="flex items-center gap-4">
+              <button
+                onClick={requestNotificationPermission}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  notificationPermission === 'granted'
+                    ? 'bg-green-500/20 border border-green-400/30 text-green-300'
+                    : 'bg-cyan-500/20 border border-cyan-400/30 text-cyan-300 hover:bg-cyan-500/30'
+                }`}
+              >
+                {notificationPermission === 'granted'
+                  ? '✓ Notifications Enabled'
+                  : '🔔 Enable Push Notifications'}
+              </button>
+              {/* Language Switcher */}
+              <LanguageSwitcher />
+            </div>
           </div>
         </header>
 
