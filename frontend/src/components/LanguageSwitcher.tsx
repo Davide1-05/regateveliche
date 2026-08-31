@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import './LanguageSwitcher.css';
 
@@ -20,21 +21,55 @@ const LANGUAGES: Record<LanguageCode, LanguageOption> = {
 
 const LanguageSwitcher: React.FC = () => {
   const { i18n, t } = useTranslation();
-  const [isOpen, setIsOpen] = React.useState(false);
-  const dropdownRef = React.useRef<HTMLDivElement>(null);
+  const [isOpen, setIsOpen] = useState(false);
+  const [coords, setCoords] = useState({ top: 0, right: 0 });
+  
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   const currentLang = LANGUAGES[i18n.language as LanguageCode] || LANGUAGES.en;
 
-  // Close dropdown when clicking outside
-  React.useEffect(() => {
+  const updatePosition = () => {
+    if (buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect();
+      setCoords({
+        top: rect.bottom + 6,
+        right: window.innerWidth - rect.right,
+      });
+    }
+  };
+
+  const handleToggle = () => {
+    if (!isOpen) {
+      updatePosition();
+    }
+    setIsOpen(prev => !prev);
+  };
+
+  // Chiudi cliccando fuori dal menu o dal pulsante
+  useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+      const target = event.target as Node;
+      if (
+        dropdownRef.current && !dropdownRef.current.contains(target) &&
+        buttonRef.current && !buttonRef.current.contains(target)
+      ) {
         setIsOpen(false);
       }
     };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+
+    if (isOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      window.addEventListener('resize', updatePosition);
+      window.addEventListener('scroll', updatePosition, true);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      window.removeEventListener('resize', updatePosition);
+      window.removeEventListener('scroll', updatePosition, true);
+    };
+  }, [isOpen]);
 
   const handleLanguageChange = (lang: LanguageCode) => {
     i18n.changeLanguage(lang);
@@ -42,9 +77,11 @@ const LanguageSwitcher: React.FC = () => {
   };
 
   return (
-    <div className="language-switcher" ref={dropdownRef}>
+    <div className="language-switcher">
       <button
-        onClick={() => setIsOpen(!isOpen)}
+        ref={buttonRef}
+        type="button"
+        onClick={handleToggle}
         className="language-switcher-button"
         aria-label={t('common.language')}
         title={t('common.language')}
@@ -69,11 +106,27 @@ const LanguageSwitcher: React.FC = () => {
         </svg>
       </button>
 
-      {isOpen && (
-        <div className="language-dropdown">
+      {isOpen && createPortal(
+        <div
+          ref={dropdownRef}
+          className="language-dropdown"
+          style={{
+            position: 'fixed',
+            top: `${coords.top}px`,
+            right: `${coords.right}px`,
+            zIndex: 999999,
+            backgroundColor: '#0f172a',
+            minWidth: '150px',
+            borderRadius: '10px',
+            border: '1px solid rgba(255, 255, 255, 0.2)',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.6), 0 8px 10px -6px rgba(0, 0, 0, 0.6)',
+            padding: '4px',
+          }}
+        >
           {Object.values(LANGUAGES).map((lang) => (
             <button
               key={lang.code}
+              type="button"
               onClick={() => handleLanguageChange(lang.code)}
               className={`language-option ${i18n.language === lang.code ? 'active' : ''}`}
             >
@@ -86,7 +139,8 @@ const LanguageSwitcher: React.FC = () => {
               )}
             </button>
           ))}
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

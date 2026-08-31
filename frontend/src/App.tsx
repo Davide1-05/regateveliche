@@ -11,21 +11,22 @@ import RegattaRegistrationPage from './pages/RegattaRegistrationPage'
 import RegattaMapPage from './pages/RegattaMapPage'
 import RegattasPage from './pages/RegattasPage'
 import ClubsPage from './pages/ClubsPage'
-import { FEATURE_FLAGS } from './config/featureFlags'
+import { FEATURE_FLAGS, PluginProvider } from './config/featureFlags'
 
 function App() {
   return (
-    <Router>
-      <Routes>
-        <Route path="/" element={<HomePage />} />
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/register" element={<RegisterPage />} />
-        <Route path="/dashboard" element={<DashboardPage />} />
-        
-        {/* Tactical Dashboard - Optional Plugin Route */}
-        {FEATURE_FLAGS.TACTICAL_DASHBOARD && (
-          <Route path="/tactical" element={<TacticalDashboardPage />} />
-        )}
+    <PluginProvider>
+      <Router>
+        <Routes>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/register" element={<RegisterPage />} />
+          <Route path="/dashboard" element={<DashboardPage />} />
+          
+          {/* Tactical Dashboard - Optional Plugin Route */}
+          {FEATURE_FLAGS.TACTICAL_DASHBOARD && (
+            <Route path="/tactical" element={<TacticalDashboardPage />} />
+          )}
         
         <Route path="/notices" element={<OfficialNoticeBoardPage />} />
         <Route path="/payment/:regattaId" element={<PaymentPage />} />
@@ -37,8 +38,9 @@ function App() {
         <Route path="/map" element={<RegattaMapPage />} />
         <Route path="/regattas" element={<RegattasPage />} />
         <Route path="/clubs" element={<ClubsPage />} />
-      </Routes>
-    </Router>
+        </Routes>
+      </Router>
+    </PluginProvider>
   )
 }
 

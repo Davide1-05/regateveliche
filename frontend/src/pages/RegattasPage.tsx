@@ -3,6 +3,7 @@ import axios from 'axios'
 import backgroundImg from '../images/background.png'
 import { Link, useNavigate } from 'react-router-dom'
 import BuoyMapManager from '../components/BuoyMapManager'
+import { useTranslation } from 'react-i18next'
 
 interface Regatta {
   id: string
@@ -69,6 +70,7 @@ const DEFAULT_CENTER_LAT = 44.0
 const DEFAULT_CENTER_LON = 10.0
 
 export function RegattasPage() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const [regattas, setRegattas] = useState<Regatta[]>([])
   const [filteredRegattas, setFilteredRegattas] = useState<Regatta[]>([])
@@ -298,15 +300,15 @@ export function RegattasPage() {
             <div className="flex justify-between items-center mb-4">
               <div>
                 <h1 className="text-2xl font-bold text-white flex items-center gap-3">
-                  🗺️ Place Race Course Marks
+                  {t('regattasPage.placeRaceCourseMarks')}
                 </h1>
-                <p className="text-blue-200 mt-1">Regatta: {activeMapRegatta.name}</p>
+                <p className="text-blue-200 mt-1">{t('regattasPage.regatta')}: {activeMapRegatta.name}</p>
               </div>
               <button
                 onClick={closeCourseMap}
                 className="px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-sm hover:bg-white/15 text-white transition-colors"
               >
-                ← Back to Regattas
+                {t('regattasPage.backToRegattas')}
               </button>
             </div>
 
@@ -329,7 +331,7 @@ export function RegattasPage() {
                 onClick={closeCourseMap}
                 className="px-8 py-3.5 bg-white/10 border border-white/20 text-blue-100 hover:bg-white/20 rounded-xl text-base font-semibold transition-all shadow-lg flex items-center gap-2 backdrop-blur-sm"
               >
-                Confirm Marks Placement ✓
+                {t('regattasPage.donePlacingBuoys')}
               </button>
             </div>
           </div>
@@ -341,12 +343,12 @@ export function RegattasPage() {
             <header className="mb-8 flex justify-between items-start">
               <div>
                 <h1 className="text-3xl font-bold text-white flex items-center gap-3">
-                  🏁 Regatta Management
+                  🏁 {t('regattasPage.title')}
                 </h1>
-                <p className="text-blue-200 mt-2">Create, manage and monitor sailing regattas</p>
+                <p className="text-blue-200 mt-2">{t('regattasPage.manageSailingRegattas')}</p>
               </div>
               <Link to="/dashboard" className="px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-sm text-white hover:bg-white/15 transition-colors">
-                ← Back to Dashboard
+                ← {t('common.back')} {t('regattasPage.title')}
               </Link>
             </header>
 
@@ -355,7 +357,7 @@ export function RegattasPage() {
               <div className="flex flex-wrap gap-4 items-center">
                 <input
                   type="text"
-                  placeholder="Search regattas..."
+                  placeholder={t('regattasPage.searchRegattas')}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="px-3 py-1.5 border border-white/20 bg-white/10 rounded-lg text-sm focus:ring-2 focus:ring-cyan-400 text-blue-100 placeholder-blue-300 outline-none"
@@ -366,12 +368,12 @@ export function RegattasPage() {
                   onChange={(e) => setStatusFilter(e.target.value)}
                   className="px-3 py-1.5 border border-white/20 bg-white/10 rounded-lg text-sm focus:ring-2 focus:ring-cyan-400 text-blue-100 outline-none cursor-pointer [&>option]:bg-slate-800 [&>option]:text-white"
                 >
-                  <option value="all">All Status</option>
-                  <option value="planning">Planning</option>
-                  <option value="open">Open</option>
-                  <option value="closed">Closed</option>
-                  <option value="active">Active</option>
-                  <option value="completed">Completed</option>
+                  <option value="all">{t('regattasPage.allStatus')}</option>
+                  <option value="planning">{t('regattasPage.planning')}</option>
+                  <option value="open">{t('regattasPage.open')}</option>
+                  <option value="closed">{t('regattasPage.closed')}</option>
+                  <option value="active">{t('regattasPage.active')}</option>
+                  <option value="completed">{t('regattasPage.completed')}</option>
                 </select>
 
                 <select
@@ -379,7 +381,7 @@ export function RegattasPage() {
                   onChange={(e) => setClubFilter(e.target.value)}
                   className="px-3 py-1.5 border border-white/20 bg-white/10 rounded-lg text-sm focus:ring-2 focus:ring-cyan-400 text-blue-100 outline-none cursor-pointer [&>option]:bg-slate-800 [&>option]:text-white"
                 >
-                  <option value="all">All Clubs</option>
+                  <option value="all">{t('regattasPage.allClubs')}</option>
                   {clubs.map((club) => (
                     <option key={club.id} value={club.id}>{club.name}</option>
                   ))}
@@ -389,7 +391,7 @@ export function RegattasPage() {
                   onClick={() => setShowCreateModal(true)}
                   className="ml-auto px-4 py-1.5 bg-cyan-500 hover:bg-cyan-600 text-white rounded-lg text-sm font-medium transition-colors"
                 >
-                  + New Regatta
+                  {t('regattasPage.newRegatta')}
                 </button>
               </div>
             </div>
@@ -418,14 +420,14 @@ export function RegattasPage() {
                         onClick={() => navigate(`/regattas/${regatta.id}/register`)}
                         className="flex-1 px-3 py-1.5 bg-emerald-500/20 border border-emerald-400/30 text-emerald-300 hover:bg-emerald-500/30 rounded-lg text-xs font-semibold transition-colors"
                       >
-                        ⛵ Register
+                        ⛵ {t('common.register')}
                       </button>
 
                       <button
                         onClick={() => fetchEntries(regatta)}
                         className="flex-1 px-3 py-1.5 bg-amber-500/20 border border-amber-400/30 text-amber-300 hover:bg-amber-500/30 rounded-lg text-xs font-semibold transition-colors"
                       >
-                        👥 Entries
+                        👥 {t('regattasPage.entries')}
                       </button>
                     </div>
 
@@ -434,21 +436,21 @@ export function RegattasPage() {
                         onClick={() => openCourseMap(regatta)}
                         className="flex-1 px-3 py-1.5 bg-cyan-500/20 border border-cyan-400/30 text-cyan-300 hover:bg-cyan-500/30 rounded-lg text-xs transition-colors"
                       >
-                        🗺️ Course Map
+                         {t('regattasPage.courseMap')}
                       </button>
 
                       <button
                         onClick={() => openEdit(regatta)}
                         className="px-3 py-1.5 bg-white/10 border border-white/20 text-blue-100 hover:bg-white/20 rounded-lg text-xs transition-colors"
                       >
-                        Edit
+                        {t('common.edit')}
                       </button>
 
                       <button
                         onClick={() => handleDelete(regatta.id)}
                         className="px-3 py-1.5 bg-red-500/20 border border-red-400/30 text-red-300 hover:bg-red-500/30 rounded-lg text-xs transition-colors"
                       >
-                        Delete
+                        {t('common.delete')}
                       </button>
                     </div>
                   </div>
@@ -464,19 +466,19 @@ export function RegattasPage() {
         {editingRegatta && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
             <div className="bg-slate-900/90 backdrop-blur-md rounded-2xl shadow-2xl border border-white/20 w-full max-w-lg p-6">
-              <h2 className="text-xl font-bold text-white mb-4">Edit Regatta</h2>
+              <h2 className="text-xl font-bold text-white mb-4">{t('regattasPage.editingRegatta')}</h2>
 
               <div className="space-y-3">
                 <input
                   type="text"
-                  placeholder="Name"
+                  placeholder={t('common.name')}
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   className="w-full px-3 py-2 border border-white/20 bg-white/10 rounded-lg text-sm focus:ring-2 focus:ring-cyan-400 text-blue-100 placeholder-blue-300 outline-none"
                 />
                 <input
                   type="text"
-                  placeholder="Code"
+                  placeholder={t('regattasPage.code')}
                   value={formData.code}
                   onChange={(e) => setFormData({ ...formData, code: e.target.value })}
                   className="w-full px-3 py-2 border border-white/20 bg-white/10 rounded-lg text-sm focus:ring-2 focus:ring-cyan-400 text-blue-100 placeholder-blue-300 outline-none"
@@ -486,7 +488,7 @@ export function RegattasPage() {
                   onChange={(e) => setFormData({ ...formData, organizer_id: e.target.value })}
                   className="w-full px-3 py-2 border border-white/20 bg-white/10 rounded-lg text-sm focus:ring-2 focus:ring-cyan-400 text-blue-100 outline-none cursor-pointer [&>option]:bg-slate-800 [&>option]:text-white"
                 >
-                  <option value="">Select a Club (Organizer)</option>
+                  <option value="">{t('regattasPage.selectClubOrganizer')}</option>
                   {clubs.map((club) => (
                     <option key={club.id} value={club.id}>{club.name}</option>
                   ))}
@@ -547,14 +549,14 @@ export function RegattasPage() {
                   onClick={() => setEditingRegatta(null)}
                   className="flex-1 px-4 py-2 bg-white/10 border border-white/20 text-blue-100 hover:bg-white/20 rounded-lg text-sm transition-colors"
                 >
-                  Cancel
+                  {t('common.cancel')}
                 </button>
                 <button
                   type="button"
                   onClick={handleUpdate}
                   className="flex-1 px-4 py-2 bg-cyan-500 hover:bg-cyan-600 text-white rounded-lg text-sm font-medium transition-colors"
                 >
-                  Save Changes
+                  {t('common.save')} {t('regattasPage.changes')}
                 </button>
               </div>
             </div>
@@ -567,19 +569,19 @@ export function RegattasPage() {
         {showCreateModal && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
             <div className="bg-slate-900/90 backdrop-blur-md rounded-2xl shadow-2xl border border-white/20 w-full max-w-lg p-6">
-              <h2 className="text-xl font-bold text-white mb-4">Create New Regatta</h2>
+              <h2 className="text-xl font-bold text-white mb-4">{t('regattasPage.createNewRegatta')}</h2>
 
               <div className="space-y-3">
                 <input
                   type="text"
-                  placeholder="Name"
+                  placeholder={t('common.name')}
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   className="w-full px-3 py-2 border border-white/20 bg-white/10 rounded-lg text-sm focus:ring-2 focus:ring-cyan-400 text-blue-100 placeholder-blue-300 outline-none"
                 />
                 <input
                   type="text"
-                  placeholder="Code"
+                  placeholder={t('regattasPage.code')}
                   value={formData.code}
                   onChange={(e) => setFormData({ ...formData, code: e.target.value })}
                   className="w-full px-3 py-2 border border-white/20 bg-white/10 rounded-lg text-sm focus:ring-2 focus:ring-cyan-400 text-blue-100 placeholder-blue-300 outline-none"
@@ -589,7 +591,7 @@ export function RegattasPage() {
                   onChange={(e) => setFormData({ ...formData, organizer_id: e.target.value })}
                   className="w-full px-3 py-2 border border-white/20 bg-white/10 rounded-lg text-sm focus:ring-2 focus:ring-cyan-400 text-blue-100 outline-none cursor-pointer [&>option]:bg-slate-800 [&>option]:text-white"
                 >
-                  <option value="">Select a Club (Organizer)</option>
+                  <option value="">{t('regattasPage.selectClubOrganizer')}</option>
                   {clubs.map((club) => (
                     <option key={club.id} value={club.id}>{club.name}</option>
                   ))}
@@ -648,14 +650,14 @@ export function RegattasPage() {
                   onClick={() => setShowCreateModal(false)}
                   className="flex-1 px-4 py-2 bg-white/10 border border-white/20 text-blue-100 hover:bg-white/20 rounded-lg text-sm transition-colors"
                 >
-                  Cancel
+                  {t('common.cancel')}
                 </button>
                 <button
                   type="button"
                   onClick={handleCreate}
                   className="flex-1 px-4 py-2 bg-cyan-500 hover:bg-cyan-600 text-white rounded-lg text-sm font-medium transition-colors"
                 >
-                  Create & Place Marks
+                  {t('regattasPage.createAndPlaceMarks')}
                 </button>
               </div>
             </div>
@@ -672,7 +674,7 @@ export function RegattasPage() {
               <div className="p-5 border-b border-white/15 flex justify-between items-center bg-white/5">
                 <div>
                   <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                    ⛵ Registered Boats & Crews
+                    ⛵ {t('regattasPage.registeredBoatsAndCrews')}
                   </h2>
                   <p className="text-xs text-blue-200 mt-0.5">{selectedRegattaForEntries.name}</p>
                 </div>
@@ -680,7 +682,7 @@ export function RegattasPage() {
                   onClick={() => setSelectedRegattaForEntries(null)}
                   className="px-3 py-1.5 bg-white/10 border border-white/20 text-blue-100 hover:bg-white/20 rounded-lg text-xs font-medium transition-colors"
                 >
-                  ✕ Close
+                  ✕ {t('common.close')}
                 </button>
               </div>
 
@@ -689,13 +691,13 @@ export function RegattasPage() {
                 {entriesLoading ? (
                   <div className="text-center py-12">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-400 mx-auto"></div>
-                    <p className="text-sm text-blue-200 mt-3">Loading entries...</p>
+                    <p className="text-sm text-blue-200 mt-3">{t('regattasPage.loadingEntries')}</p>
                   </div>
                 ) : entries.length === 0 ? (
                   <div className="bg-white/5 backdrop-blur-sm rounded-xl border border-white/15 p-12 text-center text-blue-200">
                     <span className="text-4xl block mb-3">⚓</span>
-                    <p className="text-base font-semibold text-white">No entries found</p>
-                    <p className="text-xs text-blue-300 mt-1">No boats registered for this regatta yet.</p>
+                    <p className="text-base font-semibold text-white">{t('regattasPage.noEntriesFound')}</p>
+                    <p className="text-xs text-blue-300 mt-1">{t('regattasPage.noBoatsRegistered')}</p>
                   </div>
                 ) : (
                   <div className="space-y-4">
@@ -713,21 +715,21 @@ export function RegattasPage() {
                               </span>
                             </div>
                             <p className="text-xs text-blue-200 mt-1.5">
-                              Skipper / Owner: <b className="text-white font-medium">{entry.skipper_name}</b>
+                              {t('regattasPage.skipperOwner')}: <b className="text-white font-medium">{entry.skipper_name}</b>
                             </p>
                           </div>
                           <span className="text-xs px-2.5 py-1 rounded-full bg-emerald-500/20 border border-emerald-400/30 text-emerald-300 font-semibold">
-                            {entry.crew_count} on board
+                            {entry.crew_count} {t('regattasPage.onBoard')}
                           </span>
                         </div>
 
                         {/* Crew Members List */}
                         <div className="mt-4 pt-3 border-t border-white/10">
                           <h4 className="text-xs font-semibold text-blue-300 uppercase tracking-wider mb-2.5">
-                            Crew Members ({entry.crew_members.length}):
+                            {t('regattasPage.crewMembers')}: ({entry.crew_members.length})
                           </h4>
                           {entry.crew_members.length === 0 ? (
-                            <p className="text-xs text-blue-200/60 italic">No detailed crew list registered.</p>
+                            <p className="text-xs text-blue-200/60 italic">{t('regattasPage.noCrewListRegistered')}</p>
                           ) : (
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                               {entry.crew_members.map((c) => (

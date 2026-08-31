@@ -1,6 +1,7 @@
 .language-switcher {
   position: relative;
   display: inline-block;
+  z-index: 100;
 }
 
 .language-switcher-button {
@@ -50,14 +51,13 @@
   position: absolute;
   top: calc(100% + 6px);
   right: 0;
-  min-width: 140px;
-  background: rgba(30, 41, 59, 0.98);
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  min-width: 145px;
+  background: #0f172a; /* Colore solido scuro per non far trasparire le card sotto */
+  border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: 10px;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
   padding: 4px;
-  z-index: 1000;
-  backdrop-filter: blur(8px);
+  z-index: 99999 !important;
 }
 
 .language-option {

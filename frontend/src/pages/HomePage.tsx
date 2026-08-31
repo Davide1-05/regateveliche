@@ -2,9 +2,11 @@ import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import backgroundImg from '../images/background.png'
 import LanguageSwitcher from '../components/LanguageSwitcher'
+import { usePluginState } from '../config/featureFlags'
 
 function HomePage() {
   const { t } = useTranslation();
+  const tacticalDashboardEnabled = usePluginState('tactical_dashboard');
   
   return (
     <div className="relative min-h-screen">
@@ -43,18 +45,21 @@ function HomePage() {
           </p>
           
           {/* Feature Cards */}
-          <div className="grid md:grid-cols-3 gap-6 mt-16 text-left max-w-6xl mx-auto">
+          <div className={`grid gap-6 mt-16 text-left max-w-6xl mx-auto ${tacticalDashboardEnabled ? 'md:grid-cols-3' : 'md:grid-cols-2'}`}>
             <div className="bg-white/10 backdrop-blur-sm rounded-xl p-6 border border-white/20 hover:bg-white/15 transition-colors">
               <div className="text-cyan-300 text-4xl mb-4">⚓</div>
               <h3 className="text-white font-semibold text-lg mb-2">{t('home.regattaManagement')}</h3>
               <p className="text-blue-100">{t('dashboard.manageRegattas')}</p>
             </div>
             
-            <div className="bg-white/10 backdrop-blur-sm rounded-xl p-6 border border-white/20 hover:bg-white/15 transition-colors">
-              <div className="text-cyan-300 text-4xl mb-4">🏁</div>
-              <h3 className="text-white font-semibold text-lg mb-2">{t('home.tacticalAnalysis')}</h3>
-              <p className="text-blue-100">{t('dashboard.realTimeWrsAnalysis')}</p>
-            </div>
+            {/* Tactical Analysis - only shown when plugin is enabled */}
+            {tacticalDashboardEnabled && (
+              <div className="bg-white/10 backdrop-blur-sm rounded-xl p-6 border border-white/20 hover:bg-white/15 transition-colors">
+                <div className="text-cyan-300 text-4xl mb-4">🏁</div>
+                <h3 className="text-white font-semibold text-lg mb-2">{t('home.tacticalAnalysis')}</h3>
+                <p className="text-blue-100">{t('dashboard.realTimeWrsAnalysis')}</p>
+              </div>
+            )}
             
             <div className="bg-white/10 backdrop-blur-sm rounded-xl p-6 border border-white/20 hover:bg-white/15 transition-colors">
               <div className="text-cyan-300 text-4xl mb-4">🌊</div>

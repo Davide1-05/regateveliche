@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 
 // Mock data representing the output of the WRS algorithm
 const MOCK_TACTICAL_DATA = {
@@ -63,6 +64,7 @@ const MOCK_TACTICAL_DATA = {
 
 const TacticalDashboardPage = () => {
   const [data, setData] = useState(MOCK_TACTICAL_DATA);
+  const { t } = useTranslation();
 
   return (
     <div className="min-h-screen bg-slate-900 text-white">
@@ -70,15 +72,15 @@ const TacticalDashboardPage = () => {
       <header className="bg-slate-800 border-b border-slate-700 p-4 shadow-lg">
         <div className="container mx-auto flex justify-between items-center">
           <div>
-            <h1 className="text-2xl font-bold text-cyan-400">Tactical Command</h1>
-            <p className="text-xs text-slate-400">Real-time WRS Analysis</p>
+            <h1 className="text-2xl font-bold text-cyan-400">{t('tacticalPage.title')}</h1>
+            <p className="text-xs text-slate-400">{t('tacticalPage.realTimeWrsAnalysis')}</p>
           </div>
           <nav className="flex gap-4">
-            <Link to="/dashboard" className="text-sm hover:text-cyan-400 transition-colors">Main Dashboard</Link>
+            <Link to="/dashboard" className="text-sm hover:text-cyan-400 transition-colors">{t('tacticalPage.mainDashboard')}</Link>
             <button onClick={() => { localStorage.removeItem('token');
                                      localStorage.removeItem('user'); 
                                      window.location.href = '/login'; }}
-            className="bg-red-600 px-3 py-1 rounded text-sm hover:bg-red-700">Logout</button>
+            className="bg-red-600 px-3 py-1 rounded text-sm hover:bg-red-700">{t('common.logout')}</button>
           </nav>
         </div>
       </header>
@@ -87,40 +89,40 @@ const TacticalDashboardPage = () => {
         {/* Performance Summary */}
         <div className="lg:col-span-1 space-y-6">
           <section className="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-xl">
-            <h2 className="text-lg font-semibold mb-4 text-cyan-300">Boat Status: {data.sailNumber}</h2>
+            <h2 className="text-lg font-semibold mb-4 text-cyan-300">{t('tacticalPage.boatStatus', { sailNumber: data.sailNumber })}</h2>
             <div className="space-y-4">
               <div className="flex justify-between border-b border-slate-700 pb-2">
-                <span className="text-slate-400">Elapsed Time</span>
+                <span className="text-slate-400">{t('tacticalPage.elapsedTime')}</span>
                 <span className="font-mono text-xl">{new Date(data.currentStatus.elapsedTime * 1000).toISOString().substr(11, 8)}</span>
               </div>
               <div className="flex justify-between border-b border-slate-700 pb-2">
-                <span className="text-slate-400">Corrected Time</span>
+                <span className="text-slate-400">{t('tacticalPage.correctedTime')}</span>
                 <span className="font-mono text-xl text-green-400">{new Date(data.currentStatus.correctedTime * 1000).toISOString().substr(11, 8)}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-slate-400">Weather Factor</span>
+                <span className="text-slate-400">{t('tacticalPage.weatherFactor')}</span>
                 <span className="font-bold">{data.currentStatus.weatherFactor.toFixed(3)}</span>
               </div>
             </div>
           </section>
 
           <section className="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-xl">
-            <h2 className="text-lg font-semibold mb-4 text-cyan-300">Current Conditions</h2>
+            <h2 className="text-lg font-semibold mb-4 text-cyan-300">{t('tacticalPage.currentConditions')}</h2>
             <div className="grid grid-cols-2 gap-4">
               <div className="bg-slate-900 p-3 rounded border border-slate-700">
-                <p className="text-xs text-slate-500 uppercase">Wind Speed</p>
+                <p className="text-xs text-slate-500 uppercase">{t('tacticalPage.windSpeed')}</p>
                 <p className="text-xl font-bold">{data.currentWeather.windSpeed} kn</p>
               </div>
               <div className="bg-slate-900 p-3 rounded border border-slate-700">
-                <p className="text-xs text-slate-500 uppercase">Wind Dir</p>
+                <p className="text-xs text-slate-500 uppercase">{t('tacticalPage.windDir')}</p>
                 <p className="text-xl font-bold">{data.currentWeather.windDirection}°</p>
               </div>
               <div className="bg-slate-900 p-3 rounded border border-slate-700">
-                <p className="text-xs text-slate-500 uppercase">Wave Height</p>
+                <p className="text-xs text-slate-500 uppercase">{t('tacticalPage.waveHeight')}</p>
                 <p className="text-xl font-bold">{data.currentWeather.waveHeight}m</p>
               </div>
               <div className="bg-slate-900 p-3 rounded border border-slate-700">
-                <p className="text-xs text-slate-500 uppercase">Wave Period</p>
+                <p className="text-xs text-slate-500 uppercase">{t('tacticalPage.wavePeriod')}</p>
                 <p className="text-xl font-bold">{data.currentWeather.wavePeriod}s</p>
               </div>
             </div>
@@ -130,18 +132,18 @@ const TacticalDashboardPage = () => {
         {/* Route Analysis */}
         <div className="lg:col-span-2">
           <section className="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-xl h-full">
-            <h2 className="text-lg font-semibold mb-4 text-cyan-300">Optimized Route Segments</h2>
+            <h2 className="text-lg font-semibold mb-4 text-cyan-300">{t('tacticalPage.optimizedRouteSegments')}</h2>
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="border-b border-slate-700 text-slate-400 text-sm">
-                    <th className="p-2">Leg</th>
-                    <th className="p-2">Distance</th>
-                    <th className="p-2">Bearing</th>
+                    <th className="p-2">{t('tacticalPage.leg')}</th>
+                    <th className="p-2">{t('tacticalPage.distance')}</th>
+                    <th className="p-2">{t('tacticalPage.bearing')}</th>
                     <th className="p-2">TWA</th>
-                    <th className="p-2">Opt. Heading</th>
-                    <th className="p-2">VMG (kn)</th>
-                    <th className="p-2">Time</th>
+                    <th className="p-2">{t('tacticalPage.optHeading')}</th>
+                    <th className="p-2">{t('tacticalPage.vmgKn')}</th>
+                    <th className="p-2">{t('tacticalPage.time')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -160,10 +162,9 @@ const TacticalDashboardPage = () => {
               </table>
             </div>
             <div className="mt-8 p-4 bg-cyan-900/20 border border-cyan-800 rounded-lg">
-              <h3 className="text-sm font-bold text-cyan-400 mb-1">Tactical Insight</h3>
+              <h3 className="text-sm font-bold text-cyan-400 mb-1">{t('tacticalPage.tacticalInsight')}</h3>
               <p className="text-xs text-slate-300">
-                The current optimized headings are calculated using the WRS engine. 
-                Deviation from these headings will result in a lower VMG and an increase in your PET (Predicted Elapsed Time).
+                {t('tacticalPage.tacticalInsightText')}
               </p>
             </div>
           </section>

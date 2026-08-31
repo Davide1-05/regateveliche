@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import { useTranslation } from 'react-i18next';
 
 // Types
 interface TelemetryPoint {
@@ -288,14 +289,16 @@ const RegattaMapPage: React.FC = () => {
   // Get selected boat data
   const selectedBoatData = selectedBoatId ? boatPositionsRef.current[selectedBoatId] : null;
 
+  const { t } = useTranslation();
+
   return (
     <div className="min-h-screen bg-slate-900 text-white">
       {/* Header */}
       <header className="bg-slate-800 border-b border-slate-700 p-4 shadow-lg">
         <div className="container mx-auto flex justify-between items-center">
           <div>
-            <h1 className="text-2xl font-bold text-cyan-400">Regatta Map</h1>
-            <p className="text-xs text-slate-400">Real-time GPS Tracking</p>
+            <h1 className="text-2xl font-bold text-cyan-400">{t('mapPage.title')}</h1>
+            <p className="text-xs text-slate-400">{t('mapPage.realTimeGpsTracking')}</p>
           </div>
           <nav className="flex gap-4 items-center">
             <button
@@ -304,10 +307,10 @@ const RegattaMapPage: React.FC = () => {
                 isLiveTracking ? 'bg-green-600 hover:bg-green-700' : 'bg-slate-600 hover:bg-slate-700'
               }`}
             >
-              {isLiveTracking ? '● Live Tracking' : '○ Paused'}
+              {isLiveTracking ? t('mapPage.liveTracking') : t('mapPage.paused')}
             </button>
-            <Link to="/dashboard" className="text-sm hover:text-cyan-400 transition-colors">Dashboard</Link>
-            <button className="bg-red-600 px-3 py-1 rounded text-sm hover:bg-red-700">Logout</button>
+            <Link to="/dashboard" className="text-sm hover:text-cyan-400 transition-colors">{t('dashboard.title')}</Link>
+            <button className="bg-red-600 px-3 py-1 rounded text-sm hover:bg-red-700">{t('common.logout')}</button>
           </nav>
         </div>
       </header>
@@ -324,7 +327,7 @@ const RegattaMapPage: React.FC = () => {
           {/* Boat List - takes 2/5 of sidebar height */}
           <section className="bg-slate-800 rounded-xl border border-slate-700 shadow-xl overflow-hidden flex flex-col" style={{ flex: '2', minHeight: 0 }}>
             <div className="p-3 bg-slate-700/50 border-b border-slate-600">
-              <h2 className="text-sm font-semibold text-cyan-400 uppercase tracking-wide">Boats ({MOCK_BOATS.length})</h2>
+              <h2 className="text-sm font-semibold text-cyan-400 uppercase tracking-wide">{t('mapPage.boats').replace('{count}', String(MOCK_BOATS.length))}</h2>
             </div>
             <div className="overflow-y-auto flex-1 p-2 space-y-1">
               {MOCK_BOATS.map((boat, index) => (
@@ -355,38 +358,38 @@ const RegattaMapPage: React.FC = () => {
           {/* Selected Boat Info - takes 1/5 of sidebar height */}
           <section className="bg-slate-800 rounded-xl border border-slate-700 shadow-xl overflow-hidden flex flex-col" style={{ flex: '1', minHeight: 0 }}>
             <div className="p-3 bg-slate-700/50 border-b border-slate-600">
-              <h2 className="text-sm font-semibold text-cyan-400 uppercase tracking-wide">Boat Details</h2>
+              <h2 className="text-sm font-semibold text-cyan-400 uppercase tracking-wide">{t('mapPage.boatDetails')}</h2>
             </div>
             {selectedBoatData ? (
               <div className="p-3 space-y-3 overflow-y-auto flex-1">
                 <div>
-                  <p className="text-xs text-slate-400 uppercase tracking-wide mb-1">Boat</p>
+                  <p className="text-xs text-slate-400 uppercase tracking-wide mb-1">{t('mapPage.speed')}</p>
                   <p className="font-bold text-white">{selectedBoatData.boatName}</p>
                   <p className="text-sm text-slate-300">{selectedBoatData.sailNumber}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-slate-400 uppercase tracking-wide mb-1">Skipper</p>
+                  <p className="text-xs text-slate-400 uppercase tracking-wide mb-1">{t('mapPage.heading')}</p>
                   <p className="font-semibold text-white">{selectedBoatData.skipperName}</p>
                   <p className="text-sm text-slate-300">{selectedBoatData.clubName}</p>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="bg-slate-700/50 p-2 rounded-lg">
-                    <p className="text-xs text-slate-400 uppercase tracking-wide mb-1">Speed</p>
+                    <p className="text-xs text-slate-400 uppercase tracking-wide mb-1">{t('mapPage.speed')}</p>
                     <p className="font-bold text-cyan-400">{selectedBoatData.sog.toFixed(1)} kn</p>
                   </div>
                   <div className="bg-slate-700/50 p-2 rounded-lg">
-                    <p className="text-xs text-slate-400 uppercase tracking-wide mb-1">Heading</p>
+                    <p className="text-xs text-slate-400 uppercase tracking-wide mb-1">{t('mapPage.heading')}</p>
                     <p className="font-bold text-cyan-400">{Math.round(selectedBoatData.heading)}°</p>
                   </div>
                 </div>
                 <div className="bg-slate-700/50 p-2 rounded-lg">
-                  <p className="text-xs text-slate-400 uppercase tracking-wide mb-1">Position</p>
+                  <p className="text-xs text-slate-400 uppercase tracking-wide mb-1">{t('mapPage.position')}</p>
                   <p className="font-mono text-sm text-white">{selectedBoatData.latitude.toFixed(6)}, {selectedBoatData.longitude.toFixed(6)}</p>
                 </div>
               </div>
             ) : (
               <div className="flex items-center justify-center h-full p-4">
-                <p className="text-slate-500 text-sm text-center">Select a boat from the list to view details</p>
+                <p className="text-slate-500 text-sm text-center">{t('mapPage.selectABoaToViewDetails')}</p>
               </div>
             )}
           </section>
@@ -394,7 +397,7 @@ const RegattaMapPage: React.FC = () => {
           {/* Wind Indicator - takes 2/5 of sidebar height */}
           <section className="bg-slate-800 rounded-xl border border-slate-700 shadow-xl overflow-hidden flex flex-col" style={{ flex: '2', minHeight: 0 }}>
             <div className="p-3 bg-slate-700/50 border-b border-slate-600">
-              <h2 className="text-sm font-semibold text-cyan-400 uppercase tracking-wide">Wind Indicator</h2>
+              <h2 className="text-sm font-semibold text-cyan-400 uppercase tracking-wide">{t('mapPage.windIndicator')}</h2>
             </div>
             <div className="flex flex-col items-center justify-center p-3 gap-2 overflow-y-auto flex-1">
               {/* Wind Compass Rose */}
@@ -446,18 +449,18 @@ const RegattaMapPage: React.FC = () => {
               {/* Wind speed readout */}
               <div className="text-center">
                 <p className="text-3xl font-bold text-cyan-400">{windSpeed.toFixed(1)}</p>
-                <p className="text-xs text-slate-400 uppercase tracking-wide">knots</p>
+                <p className="text-xs text-slate-400 uppercase tracking-wide">{t('mapPage.knots')}</p>
               </div>
 
               {/* Wind direction readout */}
               <div className="text-center">
                 <p className="text-xl font-bold text-white">{Math.round(windDirection)}°</p>
-                <p className="text-xs text-slate-400 uppercase tracking-wide">direction</p>
+                <p className="text-xs text-slate-400 uppercase tracking-wide">{t('mapPage.direction')}</p>
               </div>
 
               {/* Beaufort scale indicator */}
               <div className="w-full bg-slate-700/50 rounded-lg p-2">
-                <p className="text-xs text-center text-slate-300 font-semibold">Beaufort Scale</p>
+                <p className="text-xs text-center text-slate-300 font-semibold">{t('mapPage.beaufortScale')}</p>
                 <div className="flex items-center gap-1 mt-1">
                   {[...Array(13)].map((_, i) => (
                     <div key={i} className={`h-2 flex-1 rounded-sm ${windSpeed >= i * 2 ? (windSpeed > 25 ? 'bg-red-500' : windSpeed > 15 ? 'bg-yellow-500' : 'bg-cyan-500') : 'bg-slate-600'}`} />

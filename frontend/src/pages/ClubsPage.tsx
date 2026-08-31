@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import axios from 'axios'
 import backgroundImg from '../images/background.png'
 import { Link } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 
 interface Club {
   id: string
@@ -27,6 +28,7 @@ interface ClubMember {
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
 export function ClubsPage() {
+  const { t } = useTranslation()
   const [clubs, setClubs] = useState<Club[]>([])
   const [filteredClubs, setFilteredClubs] = useState<Club[]>([])
   const [loading, setLoading] = useState(true)
@@ -127,7 +129,7 @@ export function ClubsPage() {
   }
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this club?')) return
+    if (!confirm(t('clubsPage.deleteConfirm'))) return
     try {
       const token = localStorage.getItem('access_token')
       await axios.delete(`${API_BASE_URL}/clubs/${id}`, {
@@ -189,12 +191,12 @@ export function ClubsPage() {
           <div className="flex justify-between items-start">
             <div>
               <h1 className="text-3xl font-bold text-white flex items-center gap-3">
-                🏛️ Club Management
+                🏛️ {t('clubsPage.title')}
               </h1>
-              <p className="text-blue-200 mt-2">Manage sailing clubs and memberships</p>
+              <p className="text-blue-200 mt-2">{t('clubsPage.manageClubsAndMemberships')}</p>
             </div>
             <Link to="/dashboard" className="px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-sm hover:bg-white/15 transition-colors">
-              ← Back to Dashboard
+              ← {t('common.back')} {t('clubsPage.title')}
             </Link>
           </div>
         </header>
@@ -204,7 +206,7 @@ export function ClubsPage() {
           <div className="flex flex-wrap gap-4 items-center">
             <input
               type="text"
-              placeholder="Search clubs..."
+              placeholder={t('clubsPage.searchClubs')}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="px-3 py-1.5 border border-white/20 bg-white/10 rounded-lg text-sm focus:ring-2 focus:ring-cyan-400 text-blue-100 placeholder-blue-300"
@@ -215,18 +217,18 @@ export function ClubsPage() {
               onChange={(e) => setCertificationFilter(e.target.value)}
               className="px-3 py-1.5 border border-white/20 bg-white/10 rounded-lg text-sm focus:ring-2 focus:ring-cyan-400 text-blue-100"
             >
-              <option value="all">All Levels</option>
-              <option value="bronze">Bronze</option>
-              <option value="silver">Silver</option>
-              <option value="gold">Gold</option>
-              <option value="platinum">Platinum</option>
+              <option value="all">{t('clubsPage.allLevels')}</option>
+              <option value="bronze">{t('clubsPage.bronze')}</option>
+              <option value="silver">{t('clubsPage.silver')}</option>
+              <option value="gold">{t('clubsPage.gold')}</option>
+              <option value="platinum">{t('clubsPage.platinum')}</option>
             </select>
 
             <button
               onClick={() => setShowCreateModal(true)}
               className="ml-auto px-4 py-1.5 bg-cyan-500 hover:bg-cyan-600 text-white rounded-lg text-sm font-medium transition-colors"
             >
-              + New Club
+              {t('clubsPage.newClub')}
             </button>
           </div>
         </div>
@@ -236,7 +238,7 @@ export function ClubsPage() {
           {filteredClubs.length === 0 ? (
             <div className="md:col-span-2 lg:col-span-3 bg-white/10 backdrop-blur-sm rounded-xl shadow-sm border border-white/20 p-12 text-center">
               <span className="text-4xl mb-4 block">🏛️</span>
-              <p className="text-blue-200">{searchQuery ? 'No clubs match your search' : 'No clubs found'}</p>
+              <p className="text-blue-200">{searchQuery ? t('clubsPage.noMatchSearch') : t('clubsPage.noClubsFound')}</p>
             </div>
           ) : (
             filteredClubs.map((club) => (
@@ -258,13 +260,13 @@ export function ClubsPage() {
 
                 <div className="flex gap-2">
                   <button onClick={() => fetchClubMembers(club.id)} className="flex-1 px-3 py-1.5 bg-cyan-500/20 border border-cyan-400/30 text-cyan-300 rounded-lg text-sm hover:bg-cyan-500/30 transition-colors">
-                    Members
+                    {t('clubsPage.members')}
                   </button>
                   <button onClick={() => openEdit(club)} className="px-3 py-1.5 bg-blue-500/20 border border-blue-400/30 text-blue-300 rounded-lg text-sm hover:bg-blue-500/30 transition-colors">
-                    Edit
+                    {t('clubsPage.edit')}
                   </button>
                   <button onClick={() => handleDelete(club.id)} className="px-3 py-1.5 bg-red-500/20 border border-red-400/30 text-red-300 rounded-lg text-sm hover:bg-red-500/30 transition-colors">
-                    Delete
+                    {t('clubsPage.delete')}
                   </button>
                 </div>
               </div>
@@ -275,11 +277,11 @@ export function ClubsPage() {
         {/* Club Members Panel */}
         {selectedClubId && (
           <div className="mt-8 bg-white/10 backdrop-blur-sm rounded-xl shadow-sm border border-white/20 p-6">
-            <h3 className="text-lg font-semibold text-white mb-4">Club Members</h3>
+            <h3 className="text-lg font-semibold text-white mb-4">{t('clubsPage.clubMembers')}</h3>
             {loadingMembers ? (
-              <p className="text-blue-200">Loading...</p>
+              <p className="text-blue-200">{t('clubsPage.loading')}</p>
             ) : clubMembers.length === 0 ? (
-              <p className="text-blue-200">No members found for this club.</p>
+              <p className="text-blue-200">{t('clubsPage.noMembersFound')}</p>
             ) : (
               <div className="space-y-3">
                 {clubMembers.map((member) => (
@@ -298,27 +300,27 @@ export function ClubsPage() {
       {showCreateModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-slate-800 rounded-xl shadow-xl border border-slate-700 w-full max-w-lg p-6 overflow-y-auto" style={{ maxHeight: '90vh' }}>
-            <h2 className="text-xl font-bold text-white mb-4">Create New Club</h2>
+            <h2 className="text-xl font-bold text-white mb-4">{t('clubsPage.createNewClub')}</h2>
 
             <div className="space-y-3">
-              <input type="text" placeholder="Name" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:ring-2 focus:ring-cyan-400" />
-              <input type="text" placeholder="Federation Code (optional)" value={formData.federation_code} onChange={(e) => setFormData({ ...formData, federation_code: e.target.value })} className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:ring-2 focus:ring-cyan-400" />
-              <input type="email" placeholder="Email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:ring-2 focus:ring-cyan-400" />
-              <input type="text" placeholder="Phone (optional)" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:ring-2 focus:ring-cyan-400" />
-              <input type="text" placeholder="Address (optional)" value={formData.address} onChange={(e) => setFormData({ ...formData, address: e.target.value })} className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:ring-2 focus:ring-cyan-400" />
-              <input type="text" placeholder="City (optional)" value={formData.city} onChange={(e) => setFormData({ ...formData, city: e.target.value })} className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:ring-2 focus:ring-cyan-400" />
-              <input type="text" placeholder="Postal Code (optional)" value={formData.postal_code} onChange={(e) => setFormData({ ...formData, postal_code: e.target.value })} className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:ring-2 focus:ring-cyan-400" />
+              <input type="text" placeholder={t('clubsPage.name')} value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:ring-2 focus:ring-cyan-400" />
+              <input type="text" placeholder={t('clubsPage.federationCode')} value={formData.federation_code} onChange={(e) => setFormData({ ...formData, federation_code: e.target.value })} className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:ring-2 focus:ring-cyan-400" />
+              <input type="email" placeholder={t('clubsPage.emailAddress')} value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:ring-2 focus:ring-cyan-400" />
+              <input type="text" placeholder={t('clubsPage.phone')} value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:ring-2 focus:ring-cyan-400" />
+              <input type="text" placeholder={t('clubsPage.address')} value={formData.address} onChange={(e) => setFormData({ ...formData, address: e.target.value })} className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:ring-2 focus:ring-cyan-400" />
+              <input type="text" placeholder={t('clubsPage.city')} value={formData.city} onChange={(e) => setFormData({ ...formData, city: e.target.value })} className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:ring-2 focus:ring-cyan-400" />
+              <input type="text" placeholder={t('clubsPage.postalCode')} value={formData.postal_code} onChange={(e) => setFormData({ ...formData, postal_code: e.target.value })} className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:ring-2 focus:ring-cyan-400" />
               <select value={formData.certification_level} onChange={(e) => setFormData({ ...formData, certification_level: e.target.value })} className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:ring-2 focus:ring-cyan-400">
-                <option value="bronze">Bronze</option>
-                <option value="silver">Silver</option>
-                <option value="gold">Gold</option>
-                <option value="platinum">Platinum</option>
+                <option value="bronze">{t('clubsPage.bronze')}</option>
+                <option value="silver">{t('clubsPage.silver')}</option>
+                <option value="gold">{t('clubsPage.gold')}</option>
+                <option value="platinum">{t('clubsPage.platinum')}</option>
               </select>
             </div>
 
             <div className="flex gap-3 mt-6">
-              <button onClick={() => setShowCreateModal(false)} className="flex-1 px-4 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-600 transition-colors">Cancel</button>
-              <button onClick={handleCreate} className="flex-1 px-4 py-2 bg-cyan-500 text-white rounded-lg hover:bg-cyan-600 transition-colors">Create</button>
+              <button onClick={() => setShowCreateModal(false)} className="flex-1 px-4 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-600 transition-colors">{t('common.cancel')}</button>
+              <button onClick={handleCreate} className="flex-1 px-4 py-2 bg-cyan-500 text-white rounded-lg hover:bg-cyan-600 transition-colors">{t('clubsPage.create')}</button>
             </div>
           </div>
         </div>
@@ -328,27 +330,27 @@ export function ClubsPage() {
       {editingClub && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-slate-800 rounded-xl shadow-xl border border-slate-700 w-full max-w-lg p-6 overflow-y-auto" style={{ maxHeight: '90vh' }}>
-            <h2 className="text-xl font-bold text-white mb-4">Edit Club</h2>
+            <h2 className="text-xl font-bold text-white mb-4">{t('clubsPage.editingClub')}</h2>
 
             <div className="space-y-3">
-              <input type="text" placeholder="Name" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:ring-2 focus:ring-cyan-400" />
-              <input type="text" placeholder="Federation Code (optional)" value={formData.federation_code} onChange={(e) => setFormData({ ...formData, federation_code: e.target.value })} className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:ring-2 focus:ring-cyan-400" />
-              <input type="email" placeholder="Email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:ring-2 focus:ring-cyan-400" />
-              <input type="text" placeholder="Phone (optional)" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:ring-2 focus:ring-cyan-400" />
-              <input type="text" placeholder="Address (optional)" value={formData.address} onChange={(e) => setFormData({ ...formData, address: e.target.value })} className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:ring-2 focus:ring-cyan-400" />
-              <input type="text" placeholder="City (optional)" value={formData.city} onChange={(e) => setFormData({ ...formData, city: e.target.value })} className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:ring-2 focus:ring-cyan-400" />
-              <input type="text" placeholder="Postal Code (optional)" value={formData.postal_code} onChange={(e) => setFormData({ ...formData, postal_code: e.target.value })} className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:ring-2 focus:ring-cyan-400" />
+              <input type="text" placeholder={t('clubsPage.name')} value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:ring-2 focus:ring-cyan-400" />
+              <input type="text" placeholder={t('clubsPage.federationCode')} value={formData.federation_code} onChange={(e) => setFormData({ ...formData, federation_code: e.target.value })} className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:ring-2 focus:ring-cyan-400" />
+              <input type="email" placeholder={t('clubsPage.emailAddress')} value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:ring-2 focus:ring-cyan-400" />
+              <input type="text" placeholder={t('clubsPage.phone')} value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:ring-2 focus:ring-cyan-400" />
+              <input type="text" placeholder={t('clubsPage.address')} value={formData.address} onChange={(e) => setFormData({ ...formData, address: e.target.value })} className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:ring-2 focus:ring-cyan-400" />
+              <input type="text" placeholder={t('clubsPage.city')} value={formData.city} onChange={(e) => setFormData({ ...formData, city: e.target.value })} className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:ring-2 focus:ring-cyan-400" />
+              <input type="text" placeholder={t('clubsPage.postalCode')} value={formData.postal_code} onChange={(e) => setFormData({ ...formData, postal_code: e.target.value })} className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:ring-2 focus:ring-cyan-400" />
               <select value={formData.certification_level} onChange={(e) => setFormData({ ...formData, certification_level: e.target.value })} className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:ring-2 focus:ring-cyan-400">
-                <option value="bronze">Bronze</option>
-                <option value="silver">Silver</option>
-                <option value="gold">Gold</option>
-                <option value="platinum">Platinum</option>
+                <option value="bronze">{t('clubsPage.bronze')}</option>
+                <option value="silver">{t('clubsPage.silver')}</option>
+                <option value="gold">{t('clubsPage.gold')}</option>
+                <option value="platinum">{t('clubsPage.platinum')}</option>
               </select>
             </div>
 
             <div className="flex gap-3 mt-6">
-              <button onClick={() => setEditingClub(null)} className="flex-1 px-4 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-600 transition-colors">Cancel</button>
-              <button onClick={handleUpdate} className="flex-1 px-4 py-2 bg-cyan-500 text-white rounded-lg hover:bg-cyan-600 transition-colors">Save Changes</button>
+              <button onClick={() => setEditingClub(null)} className="flex-1 px-4 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-600 transition-colors">{t('common.cancel')}</button>
+              <button onClick={handleUpdate} className="flex-1 px-4 py-2 bg-cyan-500 text-white rounded-lg hover:bg-cyan-600 transition-colors">{t('clubsPage.saveChanges')}</button>
             </div>
           </div>
         </div>

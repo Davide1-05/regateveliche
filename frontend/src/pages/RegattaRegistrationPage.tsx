@@ -2,23 +2,34 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import axios from 'axios'
 import backgroundImg from '../images/background.png'
+import { useTranslation } from 'react-i18next'
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
 interface Club {
-  id: string
+  id: string | number
   name: string
   federation_code?: string | null
 }
 
 interface Regatta {
-  id: string
+  id: string | number
   name: string
-  code: string
+  code?: string
   start_date: string
-  end_date: string
+  end_date?: string
   scoring_class: string
-  status: string
+  status?: string
+  club_id?: string | number
+  organizer_id?: string | number
+  organizer_club_id?: string | number
+  club_name?: string
+  organizer_name?: string
+  organizer?: string
+  club?: {
+    id?: string | number
+    name: string
+  }
 }
 
 interface CrewMemberItem {
@@ -29,16 +40,15 @@ interface CrewMemberItem {
 }
 
 export function RegattaRegistrationPage() {
+  const { t } = useTranslation()
   const { regattaId } = useParams<{ regattaId: string }>()
   const navigate = useNavigate()
 
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [regatta, setRegatta] = useState<Regatta | null>(null)
-  const [error, setError] = useState<string | null>(null)
-
   const [clubs, setClubs] = useState<Club[]>([])
-  const [selectedClubId, setSelectedClubId] = useState('')
+  const [error, setError] = useState<string | null>(null)
 
   // Boat Details
   const [boatDetails, setBoatDetails] = useState({
@@ -65,7 +75,7 @@ export function RegattaRegistrationPage() {
   useEffect(() => {
     const loadData = async () => {
       if (!regattaId) {
-        setError('Regatta ID is missing from the URL')
+        setError(t('registrationPage.regattaIdMissing'))
         setLoading(false)
         return
       }
@@ -76,22 +86,53 @@ export function RegattaRegistrationPage() {
           axios.get(`${API_BASE_URL}/regattas/${regattaId}`),
           axios.get(`${API_BASE_URL}/clubs`)
         ])
-        setRegatta(regattaRes.data.regatta || regattaRes.data)
-        setClubs(clubsRes.data.clubs || [])
+
+        // Normalizzazione dati regata
+        const regattaData: Regatta = regattaRes.data.regatta || regattaRes.data
+
+        // Normalizzazione dati circoli (gestisce array diretto o oggetto annidato)
+        let clubsList: Club[] = []
+        if (Array.isArray(clubsRes.data)) {
+          clubsList = clubsRes.data
+        } else if (Array.isArray(clubsRes.data?.clubs)) {
+          clubsList = clubsRes.data.clubs
+        } else if (Array.isArray(clubsRes.data?.data)) {
+          clubsList = clubsRes.data.data
+        }
+
+        setRegatta(regattaData)
+        setClubs(clubsList)
+
+        // Pre-imposta la classe di rating ereditata dalla regata
+        if (regattaData.scoring_class) {
+          setBoatDetails(prev => ({ ...prev, classType: regattaData.scoring_class }))
+        }
       } catch (err: any) {
-        console.error('Error loading regatta:', err)
-        setError(err.response?.data?.detail || 'Unable to load regatta data')
+        console.error('Error loading regatta data:', err)
+        setError(err.response?.data?.detail || t('registrationPage.unableToLoadRegatta'))
       } finally {
         setLoading(false)
       }
     }
 
     loadData()
-  }, [regattaId])
+  }, [regattaId, t])
+
+  // Risoluzione robusta del nome del circolo organizzatore
+  const targetClubId = regatta?.club_id ?? regatta?.organizer_id ?? regatta?.organizer_club_id
+  const matchedClub = clubs.find(c => String(c.id) === String(targetClubId))
+
+  const organizingClubName =
+    regatta?.club?.name ||
+    regatta?.club_name ||
+    regatta?.organizer_name ||
+    regatta?.organizer ||
+    matchedClub?.name ||
+    (targetClubId ? `Circolo #${targetClubId}` : 'Circolo Organizzatore')
 
   const addCrewMember = () => {
     if (!newCrewMember.name.trim() || !newCrewMember.email.trim()) {
-      setFormErrors(prev => ({ ...prev, newCrew: 'Name and email are required' }))
+      setFormErrors(prev => ({ ...prev, newCrew: t('registrationPage.nameEmailRequired') }))
       return
     }
     setCrewMembers([...crewMembers, { ...newCrewMember }])
@@ -109,13 +150,12 @@ export function RegattaRegistrationPage() {
 
   const validateForm = () => {
     const errors: Record<string, string> = {}
-    if (!selectedClubId) errors.club = 'Please select a club'
-    if (!boatDetails.boatName.trim()) errors.boatName = 'Boat name is required'
-    if (!boatDetails.sailNumber.trim()) errors.sailNumber = 'Sail number is required'
-    if (crewMembers.length === 0) errors.crew = 'Please add at least one crew member'
-    if (!emergencyContact.name.trim()) errors.emergencyName = 'Emergency contact name is required'
-    if (!emergencyContact.phone.trim()) errors.emergencyPhone = 'Emergency phone number is required'
-    if (!signatureAccepted) errors.signature = 'You must accept the terms and rules to register'
+    if (!boatDetails.boatName.trim()) errors.boatName = t('registrationPage.boatNameRequired')
+    if (!boatDetails.sailNumber.trim()) errors.sailNumber = t('registrationPage.sailNumberRequired')
+    if (crewMembers.length === 0) errors.crew = t('registrationPage.addCrewMember')
+    if (!emergencyContact.name.trim()) errors.emergencyName = t('registrationPage.emergencyNameRequired')
+    if (!emergencyContact.phone.trim()) errors.emergencyPhone = t('registrationPage.emergencyPhoneRequired')
+    if (!signatureAccepted) errors.signature = t('registrationPage.acceptTerms')
 
     setFormErrors(errors)
     return Object.keys(errors).length === 0
@@ -168,12 +208,12 @@ export function RegattaRegistrationPage() {
     return (
       <div className="min-h-screen flex items-center justify-center p-4">
         <div className="bg-white/10 backdrop-blur-sm p-8 rounded-xl border border-white/20 text-center max-w-md">
-          <p className="text-red-300 mb-4">{error || 'Regatta not found'}</p>
+          <p className="text-red-300 mb-4">{error || t('registrationPage.regattaNotFound')}</p>
           <button
             onClick={() => navigate('/regattas')}
             className="px-4 py-2 bg-cyan-500 hover:bg-cyan-600 text-white rounded-lg text-sm font-medium transition-colors"
           >
-            ← Back to Regattas
+            ← {t('common.back')} {t('regattasPage.title')}
           </button>
         </div>
       </div>
@@ -195,10 +235,20 @@ export function RegattaRegistrationPage() {
         <header className="mb-8 flex justify-between items-start">
           <div>
             <h1 className="text-3xl font-bold text-white flex items-center gap-3">
-              📝 Registration: {regatta.name}
+              📝 {t('registrationPage.registrationFor')}: {regatta.name}
             </h1>
-            <p className="text-blue-200 mt-2">
-              {regatta.scoring_class} • Starts: {new Date(regatta.start_date).toLocaleDateString()}
+            <p className="text-blue-200 mt-2 flex flex-wrap items-center gap-2 text-sm md:text-base">
+              <span className="font-semibold px-2.5 py-0.5 bg-white/10 rounded border border-white/15 text-cyan-200">
+                {regatta.scoring_class || 'ORC'}
+              </span>
+              <span>•</span>
+              <span className="text-cyan-300 font-medium flex items-center gap-1">
+                🏢 {organizingClubName}
+              </span>
+              <span>•</span>
+              <span>
+                {t('registrationPage.starts')}: {new Date(regatta.start_date).toLocaleDateString()}
+              </span>
             </p>
           </div>
           <button
@@ -206,70 +256,52 @@ export function RegattaRegistrationPage() {
             onClick={() => navigate('/regattas')}
             className="px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-sm text-white hover:bg-white/15 transition-colors"
           >
-            ← Back to Regattas
+            ← {t('common.back')} {t('regattasPage.title')}
           </button>
         </header>
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Section 1: Organizing Club */}
+          {/* Section 1: Boat Details */}
           <section className="bg-white/10 backdrop-blur-sm rounded-xl shadow-sm border border-white/20 p-6">
-            <h2 className="text-xl font-semibold text-white mb-4">🏢 Organizing Club</h2>
-            <select
-              value={selectedClubId}
-              onChange={(e) => setSelectedClubId(e.target.value)}
-              className="w-full px-3 py-2 border border-white/20 bg-white/10 rounded-lg text-sm focus:ring-2 focus:ring-cyan-400 text-blue-100 outline-none cursor-pointer [&>option]:bg-slate-800 [&>option]:text-white"
-            >
-              <option value="">-- Select a Club --</option>
-              {clubs.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name} {c.federation_code ? `(${c.federation_code})` : ''}
-                </option>
-              ))}
-            </select>
-            {formErrors.club && <p className="mt-1.5 text-xs text-red-300">{formErrors.club}</p>}
-          </section>
-
-          {/* Section 2: Boat Details */}
-          <section className="bg-white/10 backdrop-blur-sm rounded-xl shadow-sm border border-white/20 p-6">
-            <h2 className="text-xl font-semibold text-white mb-4">⛵ Boat Information</h2>
+            <h2 className="text-xl font-semibold text-white mb-4">⛵ {t('registrationPage.boatInformation')}</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm text-blue-200 mb-1">Boat Name *</label>
+                <label className="block text-sm text-blue-200 mb-1">{t('registrationPage.boatName')} *</label>
                 <input
                   type="text"
                   value={boatDetails.boatName}
                   onChange={(e) => setBoatDetails(prev => ({ ...prev, boatName: e.target.value }))}
                   className="w-full px-3 py-2 border border-white/20 bg-white/10 rounded-lg text-sm focus:ring-2 focus:ring-cyan-400 text-blue-100 placeholder-blue-300 outline-none"
-                  placeholder="e.g. Black Pearl"
+                  placeholder={t('registrationPage.boatNamePlaceholder')}
                 />
                 {formErrors.boatName && <p className="mt-1.5 text-xs text-red-300">{formErrors.boatName}</p>}
               </div>
 
               <div>
-                <label className="block text-sm text-blue-200 mb-1">Sail Number *</label>
+                <label className="block text-sm text-blue-200 mb-1">{t('registrationPage.sailNumber')} *</label>
                 <input
                   type="text"
                   value={boatDetails.sailNumber}
                   onChange={(e) => setBoatDetails(prev => ({ ...prev, sailNumber: e.target.value }))}
                   className="w-full px-3 py-2 border border-white/20 bg-white/10 rounded-lg text-sm focus:ring-2 focus:ring-cyan-400 text-blue-100 placeholder-blue-300 outline-none"
-                  placeholder="e.g. ITA-1234"
+                  placeholder={t('registrationPage.sailNumberPlaceholder')}
                 />
                 {formErrors.sailNumber && <p className="mt-1.5 text-xs text-red-300">{formErrors.sailNumber}</p>}
               </div>
 
               <div>
-                <label className="block text-sm text-blue-200 mb-1">Model / Hull ID</label>
+                <label className="block text-sm text-blue-200 mb-1">{t('registrationPage.modelHullId')}</label>
                 <input
                   type="text"
                   value={boatDetails.hullId}
                   onChange={(e) => setBoatDetails(prev => ({ ...prev, hullId: e.target.value }))}
                   className="w-full px-3 py-2 border border-white/20 bg-white/10 rounded-lg text-sm focus:ring-2 focus:ring-cyan-400 text-blue-100 placeholder-blue-300 outline-none"
-                  placeholder="e.g. J/70"
+                  placeholder={t('registrationPage.hullIdPlaceholder')}
                 />
               </div>
 
               <div>
-                <label className="block text-sm text-blue-200 mb-1">Rating Class</label>
+                <label className="block text-sm text-blue-200 mb-1">{t('registrationPage.ratingClass')}</label>
                 <select
                   value={boatDetails.classType}
                   onChange={(e) => setBoatDetails(prev => ({ ...prev, classType: e.target.value }))}
@@ -284,9 +316,9 @@ export function RegattaRegistrationPage() {
             </div>
           </section>
 
-          {/* Section 3: Crew Roster */}
+          {/* Section 2: Crew Roster */}
           <section className="bg-white/10 backdrop-blur-sm rounded-xl shadow-sm border border-white/20 p-6">
-            <h2 className="text-xl font-semibold text-white mb-4">👥 Crew Members *</h2>
+            <h2 className="text-xl font-semibold text-white mb-4">👥 {t('registrationPage.crewMembers')} *</h2>
             {formErrors.crew && <p className="mb-3 text-xs text-red-300">{formErrors.crew}</p>}
 
             {crewMembers.length > 0 && (
@@ -305,7 +337,7 @@ export function RegattaRegistrationPage() {
                       onClick={() => removeCrewMember(index)}
                       className="px-2.5 py-1 bg-red-500/20 border border-red-400/30 text-red-300 hover:bg-red-500/30 rounded text-xs transition-colors"
                     >
-                      Remove
+                      {t('registrationPage.remove')}
                     </button>
                   </div>
                 ))}
@@ -318,33 +350,33 @@ export function RegattaRegistrationPage() {
                 value={newCrewMember.name}
                 onChange={(e) => setNewCrewMember(prev => ({ ...prev, name: e.target.value }))}
                 className="px-3 py-1.5 border border-white/20 bg-white/10 rounded-lg text-sm focus:ring-2 focus:ring-cyan-400 text-blue-100 placeholder-blue-300 outline-none"
-                placeholder="Full Name"
+                placeholder={t('registrationPage.fullName')}
               />
               <input
                 type="email"
                 value={newCrewMember.email}
                 onChange={(e) => setNewCrewMember(prev => ({ ...prev, email: e.target.value }))}
                 className="px-3 py-1.5 border border-white/20 bg-white/10 rounded-lg text-sm focus:ring-2 focus:ring-cyan-400 text-blue-100 placeholder-blue-300 outline-none"
-                placeholder="Email Address"
+                placeholder={t('registrationPage.emailAddress')}
               />
               <input
                 type="text"
                 value={newCrewMember.phone}
                 onChange={(e) => setNewCrewMember(prev => ({ ...prev, phone: e.target.value }))}
                 className="px-3 py-1.5 border border-white/20 bg-white/10 rounded-lg text-sm focus:ring-2 focus:ring-cyan-400 text-blue-100 placeholder-blue-300 outline-none"
-                placeholder="Phone Number (Optional)"
+                placeholder={t('registrationPage.phoneNumberOptional')}
               />
               <select
                 value={newCrewMember.role}
                 onChange={(e) => setNewCrewMember(prev => ({ ...prev, role: e.target.value }))}
                 className="px-3 py-1.5 border border-white/20 bg-white/10 rounded-lg text-sm focus:ring-2 focus:ring-cyan-400 text-blue-100 outline-none cursor-pointer [&>option]:bg-slate-800 [&>option]:text-white"
               >
-                <option value="skipper">Skipper (Person in Charge)</option>
-                <option value="helm">Helm</option>
-                <option value="tactician">Tactician</option>
-                <option value="trimmer">Trimmer</option>
-                <option value="bowman">Bowman</option>
-                <option value="crew">Crew Member</option>
+                <option value="skipper">{t('registrationPage.skipper')}</option>
+                <option value="helm">{t('registrationPage.helm')}</option>
+                <option value="tactician">{t('registrationPage.tactician')}</option>
+                <option value="trimmer">{t('registrationPage.trimmer')}</option>
+                <option value="bowman">{t('registrationPage.bowman')}</option>
+                <option value="crew">{t('registrationPage.crewMember')}</option>
               </select>
             </div>
             {formErrors.newCrew && <p className="mt-2 text-xs text-red-300">{formErrors.newCrew}</p>}
@@ -354,43 +386,43 @@ export function RegattaRegistrationPage() {
               onClick={addCrewMember}
               className="mt-3 px-3 py-1.5 bg-cyan-500/20 border border-cyan-400/30 text-cyan-300 hover:bg-cyan-500/30 rounded-lg text-xs font-semibold transition-colors"
             >
-              + Add Crew Member
+              + {t('registrationPage.addCrewMember')}
             </button>
           </section>
 
-          {/* Section 4: Emergency Contacts */}
+          {/* Section 3: Emergency Contacts */}
           <section className="bg-white/10 backdrop-blur-sm rounded-xl shadow-sm border border-white/20 p-6">
-            <h2 className="text-xl font-semibold text-white mb-4">🚨 Emergency Contact</h2>
+            <h2 className="text-xl font-semibold text-white mb-4">🚨 {t('registrationPage.emergencyContact')}</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm text-blue-200 mb-1">Shore Contact Person *</label>
+                <label className="block text-sm text-blue-200 mb-1">{t('registrationPage.shoreContactPerson')} *</label>
                 <input
                   type="text"
                   value={emergencyContact.name}
                   onChange={(e) => setEmergencyContact(prev => ({ ...prev, name: e.target.value }))}
                   className="w-full px-3 py-2 border border-white/20 bg-white/10 rounded-lg text-sm focus:ring-2 focus:ring-cyan-400 text-blue-100 placeholder-blue-300 outline-none"
-                  placeholder="Full Name"
+                  placeholder={t('registrationPage.fullName')}
                 />
                 {formErrors.emergencyName && <p className="mt-1.5 text-xs text-red-300">{formErrors.emergencyName}</p>}
               </div>
 
               <div>
-                <label className="block text-sm text-blue-200 mb-1">Phone Number *</label>
+                <label className="block text-sm text-blue-200 mb-1">{t('registrationPage.phoneNumber')} *</label>
                 <input
                   type="tel"
                   value={emergencyContact.phone}
                   onChange={(e) => setEmergencyContact(prev => ({ ...prev, phone: e.target.value }))}
                   className="w-full px-3 py-2 border border-white/20 bg-white/10 rounded-lg text-sm focus:ring-2 focus:ring-cyan-400 text-blue-100 placeholder-blue-300 outline-none"
-                  placeholder="+39 333 1234567"
+                  placeholder={t('registrationPage.phonePlaceholder')}
                 />
                 {formErrors.emergencyPhone && <p className="mt-1.5 text-xs text-red-300">{formErrors.emergencyPhone}</p>}
               </div>
             </div>
           </section>
 
-          {/* Section 5: Notice & Consent */}
+          {/* Section 4: Notice & Consent */}
           <section className="bg-white/10 backdrop-blur-sm rounded-xl shadow-sm border border-white/20 p-6">
-            <h2 className="text-xl font-semibold text-white mb-4">📝 Rules & Liability Agreement</h2>
+            <h2 className="text-xl font-semibold text-white mb-4">📝 {t('registrationPage.rulesLiability')}</h2>
             <label className="flex items-start gap-3 cursor-pointer">
               <input
                 type="checkbox"
@@ -399,7 +431,7 @@ export function RegattaRegistrationPage() {
                 className="mt-1 w-4 h-4 rounded border-white/20 bg-white/10 text-cyan-500 focus:ring-cyan-400 cursor-pointer"
               />
               <span className="text-sm text-blue-100 leading-relaxed">
-                I declare that I have read the Notice of Race and Sailing Instructions, and I release the organizing authority from any liability for damages to persons or property.
+                {t('registrationPage.declarationText')}
               </span>
             </label>
             {formErrors.signature && <p className="mt-2 text-xs text-red-300">{formErrors.signature}</p>}
@@ -412,14 +444,14 @@ export function RegattaRegistrationPage() {
               onClick={() => navigate('/regattas')}
               className="px-5 py-2 bg-white/10 border border-white/20 text-blue-100 hover:bg-white/20 rounded-lg text-sm transition-colors"
             >
-              Cancel
+              {t('common.cancel')}
             </button>
             <button
               type="submit"
               disabled={submitting}
               className="px-6 py-2 bg-cyan-500 hover:bg-cyan-600 text-white rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50"
             >
-              {submitting ? 'Submitting...' : 'Complete Registration'}
+              {submitting ? t('registrationPage.submitting') : t('registrationPage.completeRegistration')}
             </button>
           </div>
         </form>

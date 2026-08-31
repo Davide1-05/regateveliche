@@ -868,6 +868,16 @@ def update_robotic_buoy_position(
         "last_heartbeat": str(mark.last_heartbeat) if mark.last_heartbeat else None,
     }
 
+# ============================================================================
+# DASHBOARD API ROUTES
+# ============================================================================
+
+from backend.api.dashboard_api import register_dashboard_routes
+
+# Register dashboard routes with the main application
+register_dashboard_routes(app)
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
