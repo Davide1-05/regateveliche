@@ -23,7 +23,7 @@ interface UseDashboardStatsReturn {
   isPollingActive: boolean;
 }
 
-// Polling interval in milliseconds (30 seconds)
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 const DEFAULT_POLLING_INTERVAL = 30000;
 
 export function useDashboardStats(
@@ -45,10 +45,13 @@ export function useDashboardStats(
       setIsLoading(true);
       setError(null);
 
-      const response = await fetch('/api/dashboard/stats', {
+      const token = localStorage.getItem('access_token') || localStorage.getItem('token');
+
+      const response = await fetch(`${API_BASE_URL}/api/dashboard/stats`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
         signal,
       });
@@ -89,7 +92,7 @@ export function useDashboardStats(
     
     fetchStats(abortControllerRef.current.signal).then(() => {
       if (isPollingActive) {
-        pollTimerRef.current = setInterval(async () => {
+        pollTimerRef.current = window.setInterval(async () => {
           if (!isMountedRef.current) return;
 
           // Cancel previous request before starting new one
@@ -131,18 +134,10 @@ export function useDashboardStats(
   }, [fetchStats, startPolling, stopPolling]);
 
   const refetch = useCallback(() => {
-    if (isPollingActive) {
-      // If polling is active, just trigger a fetch which will be picked up by the next poll cycle
-      abortControllerRef.current?.abort();
-      abortControllerRef.current = new AbortController();
-      fetchStats(abortControllerRef.current.signal);
-    } else {
-      // Manual refetch when not polling
-      abortControllerRef.current?.abort();
-      abortControllerRef.current = new AbortController();
-      fetchStats(abortControllerRef.current.signal);
-    }
-  }, [fetchStats, isPollingActive]);
+    abortControllerRef.current?.abort();
+    abortControllerRef.current = new AbortController();
+    fetchStats(abortControllerRef.current.signal);
+  }, [fetchStats]);
 
   return {
     stats,
