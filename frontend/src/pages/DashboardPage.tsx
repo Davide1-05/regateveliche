@@ -3,12 +3,11 @@ import { useTranslation } from 'react-i18next'
 import backgroundImg from '../images/background.png'
 import LanguageSwitcher from '../components/LanguageSwitcher'
 import PluginToggle from '../components/PluginToggle'
-import { usePluginState, getAvailablePlugins } from '../config/featureFlags'
+import { usePluginState } from '../config/featureFlags'
 import { useDashboardStats } from '../hooks/useDashboardStats'
 
 function DashboardPage() {
   const { t } = useTranslation();
-  const plugins = getAvailablePlugins();
   const tacticalDashboardEnabled = usePluginState('tactical_dashboard');
   
   // Fetch real dashboard statistics with automatic polling
@@ -34,10 +33,18 @@ function DashboardPage() {
               <Link to="/regattas" className="text-blue-100 hover:text-cyan-300 transition-colors">{t('dashboard.regattas')}</Link>
               <Link to="/clubs" className="text-blue-100 hover:text-cyan-300 transition-colors">{t('dashboard.clubs')}</Link>
               <Link to="/map" className="text-blue-100 hover:text-cyan-300 transition-colors">{t('dashboard.regattaMap')}</Link>
-              <button onClick={() => { localStorage.removeItem('token');
-                                       localStorage.removeItem('user');
-                                       window.location.href = '/login'; }}
-              className="text-red-300 hover:text-red-200 transition-colors font-semibold">{t('common.logout')}</button>
+              <button 
+                onClick={() => { 
+                  localStorage.removeItem('token');
+                  localStorage.removeItem('access_token');
+                  localStorage.removeItem('user');
+                  window.location.href = '/login'; 
+                }}
+                className="text-red-300 hover:text-red-200 transition-colors font-semibold"
+              >
+                {t('common.logout')}
+              </button>
+              
               {/* Language Switcher */}
               <LanguageSwitcher />
               
@@ -174,7 +181,7 @@ function DashboardPage() {
 
               {/* Tactical Dashboard - only shown when plugin is enabled */}
               {tacticalDashboardEnabled && (
-                <Link to="/tactical" className="flex items-center gap-3 p-4 bg-cyan-500/10 border border-cyan-400/30 rounded-lg hover:bg-cyan-500/20 transition-colors group">
+                <Link to="/tactical-dashboard" className="flex items-center gap-3 p-4 bg-cyan-500/10 border border-cyan-400/30 rounded-lg hover:bg-cyan-500/20 transition-colors group">
                   <span className="text-2xl group-hover:scale-110 transition-transform">📡</span>
                   <div>
                     <p className="font-medium text-white">{t('dashboard.tacticalCommand')}</p>
@@ -192,35 +199,6 @@ function DashboardPage() {
               </Link>
             </div>
           </section>
-
-          {/* Plugin Settings Section - only shown when at least one plugin is enabled */}
-          {Object.values(plugins).some(p => p.enabled) && (
-            <section className="bg-white/10 backdrop-blur-sm rounded-xl shadow-sm border border-white/20 p-6">
-              <h3 className="text-lg font-semibold text-white mb-4">{t('plugins.managePlugins')}</h3>
-              
-              <div className="space-y-4">
-                {Object.entries(plugins).map(([pluginId, pluginInfo]) => (
-                  <div key={pluginId} className="flex items-center justify-between p-4 bg-white/5 rounded-lg border border-white/10">
-                    <div>
-                      <p className="text-white font-medium">{pluginInfo.name}</p>
-                      <p className="text-sm text-blue-200">
-                        {pluginInfo.enabled ? '✓ Enabled' : '○ Disabled'}
-                      </p>
-                    </div>
-                    <PluginToggle
-                      pluginId={pluginId}
-                      showLabel={false}
-                      showReset={pluginInfo.enabled !== pluginInfo.defaultEnabled}
-                    />
-                  </div>
-                ))}
-              </div>
-              
-              <p className="text-xs text-blue-300/60 mt-4 italic">
-                {t('plugins.runtimeToggleNotice')}
-              </p>
-            </section>
-          )}
         </main>
       </div>
     </div>

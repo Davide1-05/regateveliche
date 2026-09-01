@@ -247,7 +247,7 @@ export function RegattasPage() {
       end_date: regatta.end_date.split('T')[0],
       latitude: regatta.latitude?.toString() || '',
       longitude: regatta.longitude?.toString() || '',
-      scoring_class: regatta.scoring_class,
+      scoring_class: regatta.scoring_class || 'ORC',
       status: regatta.status,
     })
   }
@@ -264,13 +264,13 @@ export function RegattasPage() {
 
   const getStatusBadge = (status: string) => {
     const badges: Record<string, string> = {
-      planning: 'bg-gray-100 text-gray-800 border-gray-300',
-      open: 'bg-green-100 text-green-800 border-green-300',
-      closed: 'bg-red-100 text-red-800 border-red-300',
-      active: 'bg-blue-100 text-blue-800 border-blue-300',
-      completed: 'bg-purple-100 text-purple-800 border-purple-300',
+      planning: 'bg-gray-500/20 text-gray-300 border-gray-400/30',
+      open: 'bg-emerald-500/20 text-emerald-300 border-emerald-400/30',
+      closed: 'bg-rose-500/20 text-rose-300 border-rose-400/30',
+      active: 'bg-cyan-500/20 text-cyan-300 border-cyan-400/30',
+      completed: 'bg-purple-500/20 text-purple-300 border-purple-400/30',
     }
-    return badges[status] || badges.planning
+    return badges[status?.toLowerCase()] || badges.planning
   }
 
   if (loading) {
@@ -398,64 +398,78 @@ export function RegattasPage() {
 
             {/* Regattas Grid */}
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredRegattas.map((regatta) => (
-                <div key={regatta.id} className="bg-white/10 backdrop-blur-sm rounded-xl border border-white/20 p-6 flex flex-col justify-between hover:bg-white/15 transition-colors">
-                  <div>
-                    <div className="flex items-start justify-between mb-2">
-                      <h3 className="font-semibold text-lg text-white">{regatta.name}</h3>
-                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium border ${getStatusBadge(regatta.status)}`}>
-                        {regatta.status.toUpperCase()}
-                      </span>
+              {filteredRegattas.map((regatta) => {
+                const isRegistrationOpen = regatta.status?.toLowerCase() === 'open'
+
+                return (
+                  <div key={regatta.id} className="bg-white/10 backdrop-blur-sm rounded-xl border border-white/20 p-6 flex flex-col justify-between hover:bg-white/15 transition-colors">
+                    <div>
+                      <div className="flex items-start justify-between mb-2">
+                        <h3 className="font-semibold text-lg text-white">{regatta.name}</h3>
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium border ${getStatusBadge(regatta.status)}`}>
+                          {regatta.status.toUpperCase()}
+                        </span>
+                      </div>
+                      <p className="text-sm text-blue-300 mb-1">Code: {regatta.code}</p>
+                      <p className="text-xs text-cyan-300 mb-3 font-medium">
+                        🏆 {regatta.scoring_class || 'ORC'}
+                      </p>
+                      <p className="text-xs text-blue-200 mb-4">
+                        📅 {new Date(regatta.start_date).toLocaleDateString()} - {new Date(regatta.end_date).toLocaleDateString()}
+                      </p>
                     </div>
-                    <p className="text-sm text-blue-300 mb-3">Code: {regatta.code}</p>
-                    <p className="text-xs text-blue-200 mb-4">
-                      📅 {new Date(regatta.start_date).toLocaleDateString()} - {new Date(regatta.end_date).toLocaleDateString()}
-                    </p>
+
+                    {/* Card Action Buttons */}
+                    <div className="space-y-2 pt-4 border-t border-white/10">
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          disabled={!isRegistrationOpen}
+                          onClick={() => isRegistrationOpen && navigate(`/regattas/${regatta.id}/register`)}
+                          title={!isRegistrationOpen ? 'Iscrizioni chiuse o non disponibili' : ''}
+                          className={`flex-1 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 ${
+                            isRegistrationOpen
+                              ? 'bg-emerald-500/20 border border-emerald-400/30 text-emerald-300 hover:bg-emerald-500/30 cursor-pointer shadow-sm'
+                              : 'bg-white/5 border border-white/10 text-white/30 cursor-not-allowed opacity-50 select-none'
+                          }`}
+                        >
+                          ⛵ {t('common.register')}
+                        </button>
+
+                        <button
+                          onClick={() => fetchEntries(regatta)}
+                          className="flex-1 px-3 py-1.5 bg-amber-500/20 border border-amber-400/30 text-amber-300 hover:bg-amber-500/30 rounded-lg text-xs font-semibold transition-colors"
+                        >
+                          👥 {t('regattasPage.entries')}
+                        </button>
+                      </div>
+
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => openCourseMap(regatta)}
+                          className="flex-1 px-3 py-1.5 bg-cyan-500/20 border border-cyan-400/30 text-cyan-300 hover:bg-cyan-500/30 rounded-lg text-xs transition-colors"
+                        >
+                          {t('regattasPage.courseMap')}
+                        </button>
+
+                        <button
+                          onClick={() => openEdit(regatta)}
+                          className="px-3 py-1.5 bg-white/10 border border-white/20 text-blue-100 hover:bg-white/20 rounded-lg text-xs transition-colors"
+                        >
+                          {t('common.edit')}
+                        </button>
+
+                        <button
+                          onClick={() => handleDelete(regatta.id)}
+                          className="px-3 py-1.5 bg-red-500/20 border border-red-400/30 text-red-300 hover:bg-red-500/30 rounded-lg text-xs transition-colors"
+                        >
+                          {t('common.delete')}
+                        </button>
+                      </div>
+                    </div>
                   </div>
-
-                  {/* Card Action Buttons */}
-                  <div className="space-y-2 pt-4 border-t border-white/10">
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => navigate(`/regattas/${regatta.id}/register`)}
-                        className="flex-1 px-3 py-1.5 bg-emerald-500/20 border border-emerald-400/30 text-emerald-300 hover:bg-emerald-500/30 rounded-lg text-xs font-semibold transition-colors"
-                      >
-                        ⛵ {t('common.register')}
-                      </button>
-
-                      <button
-                        onClick={() => fetchEntries(regatta)}
-                        className="flex-1 px-3 py-1.5 bg-amber-500/20 border border-amber-400/30 text-amber-300 hover:bg-amber-500/30 rounded-lg text-xs font-semibold transition-colors"
-                      >
-                        👥 {t('regattasPage.entries')}
-                      </button>
-                    </div>
-
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => openCourseMap(regatta)}
-                        className="flex-1 px-3 py-1.5 bg-cyan-500/20 border border-cyan-400/30 text-cyan-300 hover:bg-cyan-500/30 rounded-lg text-xs transition-colors"
-                      >
-                         {t('regattasPage.courseMap')}
-                      </button>
-
-                      <button
-                        onClick={() => openEdit(regatta)}
-                        className="px-3 py-1.5 bg-white/10 border border-white/20 text-blue-100 hover:bg-white/20 rounded-lg text-xs transition-colors"
-                      >
-                        {t('common.edit')}
-                      </button>
-
-                      <button
-                        onClick={() => handleDelete(regatta.id)}
-                        className="px-3 py-1.5 bg-red-500/20 border border-red-400/30 text-red-300 hover:bg-red-500/30 rounded-lg text-xs transition-colors"
-                      >
-                        {t('common.delete')}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           </div>
         )}
@@ -526,9 +540,14 @@ export function RegattasPage() {
                   onChange={(e) => setFormData({ ...formData, scoring_class: e.target.value })}
                   className="w-full px-3 py-2 border border-white/20 bg-white/10 rounded-lg text-sm focus:ring-2 focus:ring-cyan-400 text-blue-100 outline-none cursor-pointer [&>option]:bg-slate-800 [&>option]:text-white"
                 >
-                  <option value="ORC">ORC</option>
+                  <option value="Mista">Mista / Multi-classe (Scelta all'iscrizione)</option>
+                  <option value="ORC">ORC (Club / International)</option>
                   <option value="IRC">IRC</option>
+                  <option value="One Design">One Design (Monotipo)</option>
+                  <option value="Libera">Classe Libera / Open</option>
+                  <option value="Yardstick">Portsmouth Yardstick (Derive)</option>
                   <option value="PHRF">PHRF</option>
+                  <option value="Classic">Vele d'Epoca (CIM)</option>
                 </select>
                 <select
                   value={formData.status}
@@ -629,9 +648,14 @@ export function RegattasPage() {
                   onChange={(e) => setFormData({ ...formData, scoring_class: e.target.value })}
                   className="w-full px-3 py-2 border border-white/20 bg-white/10 rounded-lg text-sm focus:ring-2 focus:ring-cyan-400 text-blue-100 outline-none cursor-pointer [&>option]:bg-slate-800 [&>option]:text-white"
                 >
-                  <option value="ORC">ORC</option>
+                  <option value="Mista">Mista / Multi-classe (Scelta all'iscrizione)</option>
+                  <option value="ORC">ORC (Club / International)</option>
                   <option value="IRC">IRC</option>
+                  <option value="One Design">One Design (Monotipo)</option>
+                  <option value="Libera">Classe Libera / Open</option>
+                  <option value="Yardstick">Portsmouth Yardstick (Derive)</option>
                   <option value="PHRF">PHRF</option>
+                  <option value="Classic">Vele d'Epoca (CIM)</option>
                 </select>
                 <select
                   value={formData.status}
@@ -665,7 +689,7 @@ export function RegattasPage() {
         )}
 
         {/* ========================================================================= */}
-        {/* MODAL: REGISTERED BOATS & CREWS VIEW (GLASSMORPHISM UNIFORMATO)           */}
+        {/* MODAL: REGISTERED BOATS & CREWS VIEW                                      */}
         {/* ========================================================================= */}
         {selectedRegattaForEntries && (
           <div className="fixed inset-0 bg-blue-950/40 backdrop-blur-md flex items-center justify-center z-50 p-4">
@@ -682,7 +706,7 @@ export function RegattasPage() {
                   onClick={() => setSelectedRegattaForEntries(null)}
                   className="px-3 py-1.5 bg-white/10 border border-white/20 text-blue-100 hover:bg-white/20 rounded-lg text-xs font-medium transition-colors"
                 >
-                  ✕ {t('common.close')}
+                  ✕ {t('common.close', 'Chiudi')}
                 </button>
               </div>
 

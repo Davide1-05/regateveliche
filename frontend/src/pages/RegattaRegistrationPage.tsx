@@ -87,10 +87,8 @@ export function RegattaRegistrationPage() {
           axios.get(`${API_BASE_URL}/clubs`)
         ])
 
-        // Normalizzazione dati regata
         const regattaData: Regatta = regattaRes.data.regatta || regattaRes.data
 
-        // Normalizzazione dati circoli (gestisce array diretto o oggetto annidato)
         let clubsList: Club[] = []
         if (Array.isArray(clubsRes.data)) {
           clubsList = clubsRes.data
@@ -103,8 +101,8 @@ export function RegattaRegistrationPage() {
         setRegatta(regattaData)
         setClubs(clubsList)
 
-        // Pre-imposta la classe di rating ereditata dalla regata
-        if (regattaData.scoring_class) {
+        // Se la regata ha una classe definita e NON è mista, impostala subito
+        if (regattaData.scoring_class && regattaData.scoring_class !== 'Mista') {
           setBoatDetails(prev => ({ ...prev, classType: regattaData.scoring_class }))
         }
       } catch (err: any) {
@@ -118,7 +116,7 @@ export function RegattaRegistrationPage() {
     loadData()
   }, [regattaId, t])
 
-  // Risoluzione robusta del nome del circolo organizzatore
+  // Risoluzione robusta del circolo
   const targetClubId = regatta?.club_id ?? regatta?.organizer_id ?? regatta?.organizer_club_id
   const matchedClub = clubs.find(c => String(c.id) === String(targetClubId))
 
@@ -129,6 +127,9 @@ export function RegattaRegistrationPage() {
     regatta?.organizer ||
     matchedClub?.name ||
     (targetClubId ? `Circolo #${targetClubId}` : 'Circolo Organizzatore')
+
+  // Logica di collegamento classe regata / classe barca
+  const isMixedRegatta = !regatta?.scoring_class || regatta?.scoring_class === 'Mista'
 
   const addCrewMember = () => {
     if (!newCrewMember.name.trim() || !newCrewMember.email.trim()) {
@@ -222,7 +223,7 @@ export function RegattaRegistrationPage() {
 
   return (
     <div className="min-h-screen py-8">
-      {/* Background overlay */}
+      {/* Background */}
       <div
         className="fixed inset-0 bg-cover bg-center bg-no-repeat -z-10"
         style={{ backgroundImage: `url(${backgroundImg})` }}
@@ -301,16 +302,31 @@ export function RegattaRegistrationPage() {
               </div>
 
               <div>
-                <label className="block text-sm text-blue-200 mb-1">{t('registrationPage.ratingClass')}</label>
+                <label className="block text-sm text-blue-200 mb-1 flex items-center justify-between">
+                  <span>{t('registrationPage.ratingClass')} *</span>
+                  {!isMixedRegatta && (
+                    <span className="text-[11px] text-cyan-300 bg-cyan-950/80 px-2 py-0.5 rounded border border-cyan-500/30">
+                      Vincolato dall'evento
+                    </span>
+                  )}
+                </label>
                 <select
+                  disabled={!isMixedRegatta}
                   value={boatDetails.classType}
                   onChange={(e) => setBoatDetails(prev => ({ ...prev, classType: e.target.value }))}
-                  className="w-full px-3 py-2 border border-white/20 bg-white/10 rounded-lg text-sm focus:ring-2 focus:ring-cyan-400 text-blue-100 outline-none cursor-pointer [&>option]:bg-slate-800 [&>option]:text-white"
+                  className={`w-full px-3 py-2 border rounded-lg text-sm outline-none transition-all ${
+                    !isMixedRegatta
+                      ? 'bg-white/5 border-white/10 text-cyan-200 cursor-not-allowed opacity-80'
+                      : 'bg-white/10 border-white/20 text-blue-100 focus:ring-2 focus:ring-cyan-400 cursor-pointer'
+                  } [&>option]:bg-slate-800 [&>option]:text-white`}
                 >
-                  <option value="ORC">ORC</option>
+                  <option value="ORC">ORC (Club / International)</option>
                   <option value="IRC">IRC</option>
-                  <option value="One Design">One Design</option>
+                  <option value="One Design">One Design (Monotipo)</option>
+                  <option value="Libera">Classe Libera / Open</option>
+                  <option value="Yardstick">Portsmouth Yardstick (Derive)</option>
                   <option value="PHRF">PHRF</option>
+                  <option value="Classic">Vele d'Epoca (CIM)</option>
                 </select>
               </div>
             </div>
