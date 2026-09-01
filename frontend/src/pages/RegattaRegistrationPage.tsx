@@ -32,11 +32,22 @@ interface Regatta {
   }
 }
 
+type CrewRole = 'skipper' | 'helm' | 'tactician' | 'trimmer' | 'bowman' | 'crew'
+
 interface CrewMemberItem {
   name: string
   email: string
   phone?: string
-  role: string
+  role: CrewRole
+}
+
+const ROLE_CONFIG: Record<CrewRole, { max: number; label: string; tag: string }> = {
+  skipper: { max: 1, label: 'Skipper (Responsabile)', tag: 'Skipper' },
+  helm: { max: 1, label: 'Timoniere', tag: 'Timoniere' },
+  tactician: { max: 1, label: 'Tattico', tag: 'Tattico' },
+  trimmer: { max: 4, label: 'Strimatore (Trimmer)', tag: 'Trimmer' },
+  bowman: { max: 2, label: 'Vedetta / Prodiere', tag: 'Prodiere' },
+  crew: { max: Infinity, label: 'Membro Equipaggio', tag: 'Equipaggio' },
 }
 
 export function RegattaRegistrationPage() {
@@ -72,6 +83,16 @@ export function RegattaRegistrationPage() {
   const [signatureAccepted, setSignatureAccepted] = useState(false)
   const [formErrors, setFormErrors] = useState<Record<string, string>>({})
 
+  // Conteggio dinamico dei ruoli a bordo
+  const roleCounts: Record<CrewRole, number> = {
+    skipper: crewMembers.filter(m => m.role === 'skipper').length,
+    helm: crewMembers.filter(m => m.role === 'helm').length,
+    tactician: crewMembers.filter(m => m.role === 'tactician').length,
+    trimmer: crewMembers.filter(m => m.role === 'trimmer').length,
+    bowman: crewMembers.filter(m => m.role === 'bowman').length,
+    crew: crewMembers.filter(m => m.role === 'crew').length,
+  }
+
   useEffect(() => {
     const loadData = async () => {
       if (!regattaId) {
@@ -101,7 +122,6 @@ export function RegattaRegistrationPage() {
         setRegatta(regattaData)
         setClubs(clubsList)
 
-        // Se la regata ha una classe definita e NON è mista, impostala subito
         if (regattaData.scoring_class && regattaData.scoring_class !== 'Mista') {
           setBoatDetails(prev => ({ ...prev, classType: regattaData.scoring_class }))
         }
@@ -116,7 +136,6 @@ export function RegattaRegistrationPage() {
     loadData()
   }, [regattaId, t])
 
-  // Risoluzione robusta del circolo
   const targetClubId = regatta?.club_id ?? regatta?.organizer_id ?? regatta?.organizer_club_id
   const matchedClub = clubs.find(c => String(c.id) === String(targetClubId))
 
@@ -128,7 +147,6 @@ export function RegattaRegistrationPage() {
     matchedClub?.name ||
     (targetClubId ? `Circolo #${targetClubId}` : 'Circolo Organizzatore')
 
-  // Logica di collegamento classe regata / classe barca
   const isMixedRegatta = !regatta?.scoring_class || regatta?.scoring_class === 'Mista'
 
   const addCrewMember = () => {
@@ -136,24 +154,58 @@ export function RegattaRegistrationPage() {
       setFormErrors(prev => ({ ...prev, newCrew: t('registrationPage.nameEmailRequired') }))
       return
     }
+
+    const currentRole = newCrewMember.role
+    const maxAllowed = ROLE_CONFIG[currentRole].max
+
+    if (roleCounts[currentRole] >= maxAllowed) {
+      setFormErrors(prev => ({
+        ...prev,
+        newCrew: `Limite massimo raggiunto per il ruolo ${ROLE_CONFIG[currentRole].label} (Max: ${maxAllowed}).`
+      }))
+      return
+    }
+
     setCrewMembers([...crewMembers, { ...newCrewMember }])
-    setNewCrewMember({ name: '', email: '', phone: '', role: 'crew' })
+
+    // Seleziona il prossimo ruolo valido disponibile
+    let nextAvailableRole: CrewRole = 'crew'
+    if (roleCounts.skipper === 0 && currentRole !== 'skipper') {
+      nextAvailableRole = 'skipper'
+    } else if (roleCounts.helm < ROLE_CONFIG.helm.max && currentRole !== 'helm') {
+      nextAvailableRole = 'helm'
+    }
+
+    setNewCrewMember({ name: '', email: '', phone: '', role: nextAvailableRole })
     setFormErrors(prev => {
       const next = { ...prev }
       delete next.newCrew
+      delete next.crew
       return next
     })
   }
 
   const removeCrewMember = (index: number) => {
+    const removedRole = crewMembers[index].role
     setCrewMembers(crewMembers.filter((_, i) => i !== index))
+
+    // Se si libera un ruolo primario (skipper/timoniere), proponilo subito nel selettore
+    if (removedRole === 'skipper') {
+      setNewCrewMember(prev => ({ ...prev, role: 'skipper' }))
+    }
   }
 
   const validateForm = () => {
     const errors: Record<string, string> = {}
     if (!boatDetails.boatName.trim()) errors.boatName = t('registrationPage.boatNameRequired')
     if (!boatDetails.sailNumber.trim()) errors.sailNumber = t('registrationPage.sailNumberRequired')
-    if (crewMembers.length === 0) errors.crew = t('registrationPage.addCrewMember')
+
+    if (crewMembers.length === 0) {
+      errors.crew = t('registrationPage.addCrewMember')
+    } else if (roleCounts.skipper === 0) {
+      errors.crew = 'È obbligatorio inserire 1 membro con il ruolo di Skipper (Responsabile).'
+    }
+
     if (!emergencyContact.name.trim()) errors.emergencyName = t('registrationPage.emergencyNameRequired')
     if (!emergencyContact.phone.trim()) errors.emergencyPhone = t('registrationPage.emergencyPhoneRequired')
     if (!signatureAccepted) errors.signature = t('registrationPage.acceptTerms')
@@ -169,13 +221,14 @@ export function RegattaRegistrationPage() {
     try {
       setSubmitting(true)
       const token = localStorage.getItem('access_token') || localStorage.getItem('token')
+      const skipperMember = crewMembers.find(m => m.role === 'skipper')
 
       const payload = {
         regatta_id: regattaId,
         boat_class: boatDetails.classType,
         hull_number: boatDetails.hullId || null,
         sail_number: boatDetails.sailNumber,
-        skipper_name: crewMembers.length > 0 ? crewMembers[0].name : 'Skipper',
+        skipper_name: skipperMember ? skipperMember.name : crewMembers[0].name,
         crew_names: JSON.stringify(crewMembers.map(m => m.name)),
         crew_members: crewMembers,
         signature_hash: `sha256:${btoa(boatDetails.sailNumber + Date.now())}`,
@@ -334,17 +387,52 @@ export function RegattaRegistrationPage() {
 
           {/* Section 2: Crew Roster */}
           <section className="bg-white/10 backdrop-blur-sm rounded-xl shadow-sm border border-white/20 p-6">
-            <h2 className="text-xl font-semibold text-white mb-4">👥 {t('registrationPage.crewMembers')} *</h2>
-            {formErrors.crew && <p className="mb-3 text-xs text-red-300">{formErrors.crew}</p>}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
+              <h2 className="text-xl font-semibold text-white">👥 {t('registrationPage.crewMembers')} *</h2>
+              
+              {/* Riepilogo completo di tutti i limiti */}
+              <div className="flex flex-wrap gap-1.5 text-[11px]">
+                <span className={`px-2 py-0.5 rounded border ${
+                  roleCounts.skipper === 1 
+                    ? 'bg-emerald-950/80 text-emerald-300 border-emerald-500/30' 
+                    : 'bg-amber-950/80 text-amber-300 border-amber-500/30 font-semibold'
+                }`}>
+                  Skipper: {roleCounts.skipper}/1 {roleCounts.skipper === 0 && '(Obbligatorio)'}
+                </span>
+                <span className="px-2 py-0.5 bg-white/5 border border-white/15 text-blue-200 rounded">
+                  Timoniere: {roleCounts.helm}/1
+                </span>
+                <span className="px-2 py-0.5 bg-white/5 border border-white/15 text-blue-200 rounded">
+                  Tattico: {roleCounts.tactician}/1
+                </span>
+                <span className="px-2 py-0.5 bg-white/5 border border-white/15 text-blue-200 rounded">
+                  Trimmer: {roleCounts.trimmer}/4
+                </span>
+                <span className="px-2 py-0.5 bg-white/5 border border-white/15 text-blue-200 rounded">
+                  Prodiere: {roleCounts.bowman}/2
+                </span>
+              </div>
+            </div>
 
+            {formErrors.crew && (
+              <p className="mb-3 text-xs text-red-300 bg-red-500/10 border border-red-500/30 p-2.5 rounded-lg">
+                ⚠️ {formErrors.crew}
+              </p>
+            )}
+
+            {/* Lista Membri Inseriti */}
             {crewMembers.length > 0 && (
               <div className="space-y-2 mb-4">
                 {crewMembers.map((member, index) => (
                   <div key={index} className="flex items-center justify-between p-3 bg-white/5 rounded-lg border border-white/10">
                     <div>
                       <span className="font-semibold text-white text-sm">{member.name}</span>
-                      <span className="ml-2 px-2 py-0.5 bg-cyan-950 text-cyan-300 border border-cyan-500/30 rounded text-[10px] uppercase font-bold tracking-wider">
-                        {member.role}
+                      <span className={`ml-2 px-2 py-0.5 rounded text-[10px] uppercase font-bold tracking-wider border ${
+                        member.role === 'skipper'
+                          ? 'bg-emerald-950 text-emerald-300 border-emerald-500/40'
+                          : 'bg-cyan-950 text-cyan-300 border-cyan-500/30'
+                      }`}>
+                        {ROLE_CONFIG[member.role].tag}
                       </span>
                       <p className="text-xs text-blue-200/70 mt-0.5">{member.email}</p>
                     </div>
@@ -360,6 +448,7 @@ export function RegattaRegistrationPage() {
               </div>
             )}
 
+            {/* Form Aggiunta Membro */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-4 bg-white/5 rounded-xl border border-white/10">
               <input
                 type="text"
@@ -382,25 +471,40 @@ export function RegattaRegistrationPage() {
                 className="px-3 py-1.5 border border-white/20 bg-white/10 rounded-lg text-sm focus:ring-2 focus:ring-cyan-400 text-blue-100 placeholder-blue-300 outline-none"
                 placeholder={t('registrationPage.phoneNumberOptional')}
               />
+
+              {/* Select Ruolo con Limiti Specifici */}
               <select
                 value={newCrewMember.role}
-                onChange={(e) => setNewCrewMember(prev => ({ ...prev, role: e.target.value }))}
+                onChange={(e) => setNewCrewMember(prev => ({ ...prev, role: e.target.value as CrewRole }))}
                 className="px-3 py-1.5 border border-white/20 bg-white/10 rounded-lg text-sm focus:ring-2 focus:ring-cyan-400 text-blue-100 outline-none cursor-pointer [&>option]:bg-slate-800 [&>option]:text-white"
               >
-                <option value="skipper">{t('registrationPage.skipper')}</option>
-                <option value="helm">{t('registrationPage.helm')}</option>
-                <option value="tactician">{t('registrationPage.tactician')}</option>
-                <option value="trimmer">{t('registrationPage.trimmer')}</option>
-                <option value="bowman">{t('registrationPage.bowman')}</option>
-                <option value="crew">{t('registrationPage.crewMember')}</option>
+                <option value="skipper" disabled={roleCounts.skipper >= ROLE_CONFIG.skipper.max}>
+                  Skipper (Responsabile) ({roleCounts.skipper}/1) {roleCounts.skipper >= 1 ? '— Limite raggiunto' : '— Richiesto'}
+                </option>
+                <option value="helm" disabled={roleCounts.helm >= ROLE_CONFIG.helm.max}>
+                  Timoniere ({roleCounts.helm}/1) {roleCounts.helm >= 1 ? '— Limite raggiunto' : ''}
+                </option>
+                <option value="tactician" disabled={roleCounts.tactician >= ROLE_CONFIG.tactician.max}>
+                  Tattico ({roleCounts.tactician}/1) {roleCounts.tactician >= 1 ? '— Limite raggiunto' : ''}
+                </option>
+                <option value="trimmer" disabled={roleCounts.trimmer >= ROLE_CONFIG.trimmer.max}>
+                  Strimatore (Trimmer) ({roleCounts.trimmer}/4) {roleCounts.trimmer >= 4 ? '— Limite raggiunto' : ''}
+                </option>
+                <option value="bowman" disabled={roleCounts.bowman >= ROLE_CONFIG.bowman.max}>
+                  Vedetta / Prodiere ({roleCounts.bowman}/2) {roleCounts.bowman >= 2 ? '— Limite raggiunto' : ''}
+                </option>
+                <option value="crew">
+                  Membro Equipaggio ({roleCounts.crew}) — Illimitato
+                </option>
               </select>
             </div>
+
             {formErrors.newCrew && <p className="mt-2 text-xs text-red-300">{formErrors.newCrew}</p>}
 
             <button
               type="button"
               onClick={addCrewMember}
-              className="mt-3 px-3 py-1.5 bg-cyan-500/20 border border-cyan-400/30 text-cyan-300 hover:bg-cyan-500/30 rounded-lg text-xs font-semibold transition-colors"
+              className="mt-3 px-4 py-2 bg-cyan-500/20 border border-cyan-400/30 text-cyan-300 hover:bg-cyan-500/30 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5"
             >
               + {t('registrationPage.addCrewMember')}
             </button>
