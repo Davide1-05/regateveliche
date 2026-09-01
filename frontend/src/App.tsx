@@ -1,5 +1,5 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
-import './i18n/index'; // Initialize i18next for all 5 languages
+import './i18n/index'; // Inizializza i18n per tutte le lingue
 import HomePage from './pages/HomePage'
 import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
@@ -11,7 +11,7 @@ import RegattaRegistrationPage from './pages/RegattaRegistrationPage'
 import RegattaMapPage from './pages/RegattaMapPage'
 import RegattasPage from './pages/RegattasPage'
 import ClubsPage from './pages/ClubsPage'
-import { FEATURE_FLAGS, PluginProvider } from './config/featureFlags'
+import { PluginProvider } from './config/featureFlags'
 
 function App() {
   return (
@@ -23,21 +23,20 @@ function App() {
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/dashboard" element={<DashboardPage />} />
           
-          {/* Tactical Dashboard - Optional Plugin Route */}
-          {FEATURE_FLAGS.TACTICAL_DASHBOARD && (
-            <Route path="/tactical" element={<TacticalDashboardPage />} />
-          )}
+          {/* Tactical Dashboard - Supporta entrambi i percorsi */}
+          <Route path="/tactical" element={<TacticalDashboardPage />} />
+          <Route path="/tactical-dashboard" element={<TacticalDashboardPage />} />
         
-        <Route path="/notices" element={<OfficialNoticeBoardPage />} />
-        <Route path="/payment/:regattaId" element={<PaymentPage />} />
+          <Route path="/notices" element={<OfficialNoticeBoardPage />} />
+          <Route path="/payment/:regattaId" element={<PaymentPage />} />
 
-        {/* Rotte Iscrizione Regata */}
-        <Route path="/regattas/:regattaId/register" element={<RegattaRegistrationPage />} />
-        <Route path="/regatta-registration/:regattaId" element={<RegattaRegistrationPage />} />
+          {/* Rotte Iscrizione Regata */}
+          <Route path="/regattas/:regattaId/register" element={<RegattaRegistrationPage />} />
+          <Route path="/regatta-registration/:regattaId" element={<RegattaRegistrationPage />} />
 
-        <Route path="/map" element={<RegattaMapPage />} />
-        <Route path="/regattas" element={<RegattasPage />} />
-        <Route path="/clubs" element={<ClubsPage />} />
+          <Route path="/map" element={<RegattaMapPage />} />
+          <Route path="/regattas" element={<RegattasPage />} />
+          <Route path="/clubs" element={<ClubsPage />} />
         </Routes>
       </Router>
     </PluginProvider>
