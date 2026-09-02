@@ -1,7 +1,7 @@
 .language-switcher {
   position: relative;
   display: inline-block;
-  z-index: 100;
+  z-index: 9999;
 }
 
 .language-switcher-button {
@@ -17,6 +17,8 @@
   cursor: pointer;
   transition: all 0.2s ease;
   white-space: nowrap;
+  position: relative;
+  z-index: 9999;
 }
 
 .language-switcher-button:hover {
@@ -57,7 +59,6 @@
   border-radius: 10px;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
   padding: 4px;
-  z-index: 99999 !important;
 }
 
 .language-option {

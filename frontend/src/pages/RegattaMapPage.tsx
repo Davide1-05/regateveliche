@@ -123,7 +123,6 @@ function createMarkIcon(type: string): L.Icon<any> {
   });
 }
 
-// RegattaMapPage component
 const RegattaMapPage: React.FC = () => {
   const mapRef = useRef<L.Map | null>(null);
   const markersRef = useRef<Map<string, L.Marker>>(new Map());
@@ -134,6 +133,8 @@ const RegattaMapPage: React.FC = () => {
   // Wind state (direction in degrees, speed in knots)
   const [windDirection, setWindDirection] = useState(180);
   const [windSpeed, setWindSpeed] = useState(12);
+
+  const { t } = useTranslation();
 
   // Initialize map and markers
   useEffect(() => {
@@ -178,7 +179,6 @@ const RegattaMapPage: React.FC = () => {
         .bindPopup(`<b>${boat.boatName}</b><br>Sail: ${boat.sailNumber}<br>Skipper: ${boat.skipperName}`)
         .addTo(map);
 
-      // Add click handler to select this boat and update the details panel
       marker.on('click', () => {
         setSelectedBoatId(boat.id);
         map.setView([boat.latitude, boat.longitude], Math.max(map.getZoom(), 15));
@@ -190,7 +190,6 @@ const RegattaMapPage: React.FC = () => {
       boatPositionsRef.current[boat.id] = { ...boat, timestamp: new Date() };
     });
 
-    // Invalidate size after content is added (fixes map rendering issues)
     setTimeout(() => {
       if (mapRef.current) {
         mapRef.current.invalidateSize();
@@ -218,34 +217,25 @@ const RegattaMapPage: React.FC = () => {
         const currentPos = boatPositionsRef.current[boat.id];
         if (!currentPos) return;
 
-        // Calculate apparent wind angle (angle between boat heading and wind direction)
-        let windAngle = ((currentWindDir - currentPos.heading + 360) % 360);
+        // Apparent wind angle calculation
+        const windAngle = ((currentWindDir - currentPos.heading + 360) % 360);
         const isRunningBeforeTheWind = windAngle > 140 && windAngle < 220;
 
-        // Boat speed scales with wind strength (polynomial relationship: stronger winds = much more speed)
+        // Speed calculation
         const windSpeedFactor = Math.pow(currentWindSpd / 10, 1.5);
         const baseSpeed = isRunningBeforeTheWind ? 7 : 4.5;
         const maxSpeed = isRunningBeforeTheWind ? 12 : 8;
         const targetSpeed = Math.min(maxSpeed, baseSpeed * windSpeedFactor + (Math.random() - 0.5) * 1.5);
 
-        // Heading adjusts toward wind direction with some randomness
-        let headingAdjustment = 0;
-        if (!isRunningBeforeTheWind) {
-          const targetHeading = currentWindDir + (Math.random() > 0.5 ? 45 : -45);
-          headingAdjustment = ((targetHeading - currentPos.heading + 180) % 360) - 90;
-        }
-
-        // Course over ground follows heading with slight leeway angle (boats slip sideways)
+        // Course adjustments
         const leewayAngle = isRunningBeforeTheWind ? 5 : 8;
         const cogDirection = currentPos.heading + (Math.random() > 0.5 ? leewayAngle : -leewayAngle);
 
-        // Movement direction: boats move forward along their heading, with slight drift from wind
         const headingRad = (currentPos.heading - 90) * (Math.PI / 180);
         const speedFactor = 0.00025 * targetSpeed;
         const newLat = Math.max(41.13, Math.min(41.15, currentPos.latitude + speedFactor * Math.cos(headingRad)));
         const newLon = Math.max(9.565, Math.min(9.582, currentPos.longitude + speedFactor * Math.sin(headingRad)));
 
-        // Update position with heading and speed variations
         const updatedBoat: TelemetryPoint = {
           ...currentPos,
           latitude: newLat,
@@ -258,7 +248,6 @@ const RegattaMapPage: React.FC = () => {
 
         boatPositionsRef.current[boat.id] = updatedBoat;
 
-        // Update marker position
         const marker = markersRef.current.get(boat.id);
         if (marker) {
           const color = getBoatColor(index);
@@ -270,7 +259,6 @@ const RegattaMapPage: React.FC = () => {
           );
         }
 
-        // Update selected boat info panel if this is the selected boat
         if (selectedBoatId === boat.id) {
           setSelectedBoatId(null);
           setTimeout(() => setSelectedBoatId(boat.id), 10);
@@ -281,15 +269,11 @@ const RegattaMapPage: React.FC = () => {
     return () => clearInterval(interval);
   }, [isLiveTracking, selectedBoatId, windDirection, windSpeed]);
 
-  // Handle boat selection from sidebar
   const handleSelectBoat = useCallback((boatId: string) => {
     setSelectedBoatId(boatId === selectedBoatId ? null : boatId);
   }, [selectedBoatId]);
 
-  // Get selected boat data
   const selectedBoatData = selectedBoatId ? boatPositionsRef.current[selectedBoatId] : null;
-
-  const { t } = useTranslation();
 
   return (
     <div className="min-h-screen bg-slate-900 text-white">
@@ -310,7 +294,17 @@ const RegattaMapPage: React.FC = () => {
               {isLiveTracking ? t('mapPage.liveTracking') : t('mapPage.paused')}
             </button>
             <Link to="/dashboard" className="text-sm hover:text-cyan-400 transition-colors">{t('dashboard.title')}</Link>
-            <button className="bg-red-600 px-3 py-1 rounded text-sm hover:bg-red-700">{t('common.logout')}</button>
+            <button
+              onClick={() => {
+                localStorage.removeItem('token');
+                localStorage.removeItem('access_token');
+                localStorage.removeItem('user');
+                window.location.href = '/login';
+              }}
+              className="bg-red-600 px-3 py-1 rounded text-sm hover:bg-red-700 transition-colors font-semibold"
+            >
+              {t('common.logout')}
+            </button>
           </nav>
         </div>
       </header>
@@ -324,10 +318,12 @@ const RegattaMapPage: React.FC = () => {
 
         {/* Sidebar */}
         <div className="lg:col-span-1 flex flex-col gap-3">
-          {/* Boat List - takes 2/5 of sidebar height */}
+          {/* Boat List */}
           <section className="bg-slate-800 rounded-xl border border-slate-700 shadow-xl overflow-hidden flex flex-col" style={{ flex: '2', minHeight: 0 }}>
             <div className="p-3 bg-slate-700/50 border-b border-slate-600">
-              <h2 className="text-sm font-semibold text-cyan-400 uppercase tracking-wide">{t('mapPage.boats').replace('{count}', String(MOCK_BOATS.length))}</h2>
+              <h2 className="text-sm font-semibold text-cyan-400 uppercase tracking-wide">
+                {t('mapPage.boats').replace('{count}', String(MOCK_BOATS.length))}
+              </h2>
             </div>
             <div className="overflow-y-auto flex-1 p-2 space-y-1">
               {MOCK_BOATS.map((boat, index) => (
@@ -355,7 +351,7 @@ const RegattaMapPage: React.FC = () => {
             </div>
           </section>
 
-          {/* Selected Boat Info - takes 1/5 of sidebar height */}
+          {/* Selected Boat Info */}
           <section className="bg-slate-800 rounded-xl border border-slate-700 shadow-xl overflow-hidden flex flex-col" style={{ flex: '1', minHeight: 0 }}>
             <div className="p-3 bg-slate-700/50 border-b border-slate-600">
               <h2 className="text-sm font-semibold text-cyan-400 uppercase tracking-wide">{t('mapPage.boatDetails')}</h2>
@@ -394,7 +390,7 @@ const RegattaMapPage: React.FC = () => {
             )}
           </section>
 
-          {/* Wind Indicator - takes 2/5 of sidebar height */}
+          {/* Wind Indicator */}
           <section className="bg-slate-800 rounded-xl border border-slate-700 shadow-xl overflow-hidden flex flex-col" style={{ flex: '2', minHeight: 0 }}>
             <div className="p-3 bg-slate-700/50 border-b border-slate-600">
               <h2 className="text-sm font-semibold text-cyan-400 uppercase tracking-wide">{t('mapPage.windIndicator')}</h2>
@@ -402,47 +398,89 @@ const RegattaMapPage: React.FC = () => {
             <div className="flex flex-col items-center justify-center p-3 gap-2 overflow-y-auto flex-1">
               {/* Wind Compass Rose */}
               <div className="relative w-full aspect-square max-w-[160px]">
-                <svg viewBox="0 0 200 200" className="w-full h-full">
-                  {/* Outer circle - properly centered with room for stroke */}
-                  <circle cx="100" cy="100" r="95" fill="none" stroke="#475569" strokeWidth="2" />
+                <svg viewBox="0 0 200 200" className="w-full h-full overflow-visible">
+                  {/* Outer circle - raggio a 78 con punti cardinali all'esterno */}
+                  <circle cx="100" cy="100" r="78" fill="none" stroke="#475569" strokeWidth="2" />
 
-                  {/* Compass directions */}
+                  {/* Compass directions - appena fuori dal cerchio (raggio 91) */}
                   {['N', 'E', 'S', 'W'].map((dir, i) => {
                     const angles = [0, 90, 180, 270];
                     const rad = (angles[i] - 90) * (Math.PI / 180);
-                    const cx = 100 + 85 * Math.cos(rad);
-                    const cy = 100 + 85 * Math.sin(rad);
+                    const cx = 100 + 91 * Math.cos(rad);
+                    const cy = 100 + 91 * Math.sin(rad);
                     return (
-                      <text key={dir} x={cx} y={cy} textAnchor="middle" dominantBaseline="central" fill="#94a3b8" fontSize="12" fontWeight="bold">
+                      <text
+                        key={dir}
+                        x={cx}
+                        y={cy}
+                        textAnchor="middle"
+                        dominantBaseline="central"
+                        fill="#cbd5e1"
+                        fontSize="13"
+                        fontWeight="bold"
+                      >
                         {dir}
                       </text>
                     );
                   })}
 
-                  {/* Tick marks */}
+                  {/* Tick marks interni */}
                   {[...Array(36)].map((_, i) => {
                     const angle = (i * 10 - 90) * (Math.PI / 180);
-                    const innerR = i % 9 === 0 ? 75 : 82;
-                    const outerR = 90;
+                    const innerR = i % 9 === 0 ? 66 : 72;
+                    const outerR = 78;
                     return (
-                      <line key={i} x1={100 + innerR * Math.cos(angle)} y1={100 + innerR * Math.sin(angle)} x2={100 + outerR * Math.cos(angle)} y2={100 + outerR * Math.sin(angle)} stroke="#475569" strokeWidth={i % 9 === 0 ? 2 : 1} />
+                      <line
+                        key={i}
+                        x1={100 + innerR * Math.cos(angle)}
+                        y1={100 + innerR * Math.sin(angle)}
+                        x2={100 + outerR * Math.cos(angle)}
+                        y2={100 + outerR * Math.sin(angle)}
+                        stroke="#475569"
+                        strokeWidth={i % 9 === 0 ? 2 : 1}
+                      />
                     );
                   })}
 
-                  {/* Wind direction arrow - pointing TO where wind is going */}
+                  {/* Freccia direzione vento */}
                   <g transform={`rotate(${windDirection}, 100, 100)`}>
-                    {/* Arrow shaft */}
-                    <line x1="100" y1="100" x2="100" y2={35 + windSpeed * 0.8} stroke="#22d3ee" strokeWidth="3" strokeLinecap="round" />
-                    {/* Arrow head */}
-                    <polygon points="100,30 94,42 106,42" fill="#22d3ee" />
+                    <line
+                      x1="100"
+                      y1="100"
+                      x2="100"
+                      y2="36"
+                      stroke="#22d3ee"
+                      strokeWidth="3"
+                      strokeLinecap="round"
+                    />
+                    <polygon points="100,26 94,38 106,38" fill="#22d3ee" />
                   </g>
 
-                  {/* Center dot */}
-                  <circle cx="100" cy="100" r="5" fill="#22d3ee" />
-
-                  {/* Wind speed bar (bottom) */}
-                  <rect x="60" y="145" width="80" height="8" rx="4" fill="#334155" />
-                  <rect x="60" y="145" width={`${(windSpeed / 40) * 80}`} height="8" rx="4" fill={windSpeed > 25 ? '#ef4444' : windSpeed > 15 ? '#f59e0b' : '#22d3ee'} />
+                  {/* Display Digitale Centrale Multifunzione (Opzione 2) */}
+                  <circle cx="100" cy="100" r="18" fill="#0f172a" stroke="#0ea5e9" strokeWidth="1.5" />
+                  <text
+                    x="100"
+                    y="97"
+                    textAnchor="middle"
+                    dominantBaseline="central"
+                    fill="#38bdf8"
+                    fontSize="10"
+                    fontWeight="bold"
+                  >
+                    {windSpeed.toFixed(1)}
+                  </text>
+                  <text
+                    x="100"
+                    y="108"
+                    textAnchor="middle"
+                    dominantBaseline="central"
+                    fill="#94a3b8"
+                    fontSize="6.5"
+                    fontWeight="bold"
+                    letterSpacing="0.5"
+                  >
+                    KTS
+                  </text>
                 </svg>
               </div>
 
@@ -463,7 +501,14 @@ const RegattaMapPage: React.FC = () => {
                 <p className="text-xs text-center text-slate-300 font-semibold">{t('mapPage.beaufortScale')}</p>
                 <div className="flex items-center gap-1 mt-1">
                   {[...Array(13)].map((_, i) => (
-                    <div key={i} className={`h-2 flex-1 rounded-sm ${windSpeed >= i * 2 ? (windSpeed > 25 ? 'bg-red-500' : windSpeed > 15 ? 'bg-yellow-500' : 'bg-cyan-500') : 'bg-slate-600'}`} />
+                    <div
+                      key={i}
+                      className={`h-2 flex-1 rounded-sm ${
+                        windSpeed >= i * 2
+                          ? (windSpeed > 25 ? 'bg-red-500' : windSpeed > 15 ? 'bg-yellow-500' : 'bg-cyan-500')
+                          : 'bg-slate-600'
+                      }`}
+                    />
                   ))}
                 </div>
               </div>

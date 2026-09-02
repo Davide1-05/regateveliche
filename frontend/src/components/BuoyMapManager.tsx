@@ -59,8 +59,8 @@ const BUOY_COLORS: Record<string, string> = {
 const BUOY_LABELS: Record<string, string> = {
   windward: 'W',
   leeward: 'L',
-  gate_left: 'GL',
-  gate_right: 'GR',
+  gate_left: 'LA', // Left A - Gate buoy A (left side)
+  gate_right: 'LB', // Left B - Gate buoy B (right side)
   finish: 'F',
 };
 

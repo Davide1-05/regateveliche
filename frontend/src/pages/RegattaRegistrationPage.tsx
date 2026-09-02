@@ -161,7 +161,7 @@ export function RegattaRegistrationPage() {
     if (roleCounts[currentRole] >= maxAllowed) {
       setFormErrors(prev => ({
         ...prev,
-        newCrew: `Limite massimo raggiunto per il ruolo ${ROLE_CONFIG[currentRole].label} (Max: ${maxAllowed}).`
+        newCrew: t('registrationPage.crewLimitReached', { role: ROLE_CONFIG[currentRole].label, max: maxAllowed })
       }))
       return
     }
@@ -203,7 +203,7 @@ export function RegattaRegistrationPage() {
     if (crewMembers.length === 0) {
       errors.crew = t('registrationPage.addCrewMember')
     } else if (roleCounts.skipper === 0) {
-      errors.crew = 'È obbligatorio inserire 1 membro con il ruolo di Skipper (Responsabile).'
+      errors.crew = t('registrationPage.skipperRequired')
     }
 
     if (!emergencyContact.name.trim()) errors.emergencyName = t('registrationPage.emergencyNameRequired')
@@ -359,7 +359,7 @@ export function RegattaRegistrationPage() {
                   <span>{t('registrationPage.ratingClass')} *</span>
                   {!isMixedRegatta && (
                     <span className="text-[11px] text-cyan-300 bg-cyan-950/80 px-2 py-0.5 rounded border border-cyan-500/30">
-                      Vincolato dall'evento
+                      {t('registrationPage.boundByEvent')}
                     </span>
                   )}
                 </label>
@@ -373,13 +373,13 @@ export function RegattaRegistrationPage() {
                       : 'bg-white/10 border-white/20 text-blue-100 focus:ring-2 focus:ring-cyan-400 cursor-pointer'
                   } [&>option]:bg-slate-800 [&>option]:text-white`}
                 >
-                  <option value="ORC">ORC (Club / International)</option>
-                  <option value="IRC">IRC</option>
-                  <option value="One Design">One Design (Monotipo)</option>
-                  <option value="Libera">Classe Libera / Open</option>
-                  <option value="Yardstick">Portsmouth Yardstick (Derive)</option>
-                  <option value="PHRF">PHRF</option>
-                  <option value="Classic">Vele d'Epoca (CIM)</option>
+                  <option value="ORC">{t('scoringClass.orc')}</option>
+                  <option value="IRC">{t('scoringClass.irс')}</option>
+                  <option value="One Design">{t('scoringClass.oneDesign')}</option>
+                  <option value="Libera">{t('scoringClass.libera')}</option>
+                  <option value="Yardstick">{t('scoringClass.yardstick')}</option>
+                  <option value="PHRF">{t('scoringClass.phrf')}</option>
+                  <option value="Classic">{t('scoringClass.classic')}</option>
                 </select>
               </div>
             </div>
@@ -390,26 +390,26 @@ export function RegattaRegistrationPage() {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
               <h2 className="text-xl font-semibold text-white">👥 {t('registrationPage.crewMembers')} *</h2>
               
-              {/* Riepilogo completo di tutti i limiti */}
+              {/* Complete summary of all limits */}
               <div className="flex flex-wrap gap-1.5 text-[11px]">
                 <span className={`px-2 py-0.5 rounded border ${
                   roleCounts.skipper === 1 
                     ? 'bg-emerald-950/80 text-emerald-300 border-emerald-500/30' 
                     : 'bg-amber-950/80 text-amber-300 border-amber-500/30 font-semibold'
                 }`}>
-                  Skipper: {roleCounts.skipper}/1 {roleCounts.skipper === 0 && '(Obbligatorio)'}
+                  Skipper: {roleCounts.skipper}/1 {roleCounts.skipper === 0 && t('registrationPage.required')}
                 </span>
                 <span className="px-2 py-0.5 bg-white/5 border border-white/15 text-blue-200 rounded">
-                  Timoniere: {roleCounts.helm}/1
+                  Helm: {roleCounts.helm}/1
                 </span>
                 <span className="px-2 py-0.5 bg-white/5 border border-white/15 text-blue-200 rounded">
-                  Tattico: {roleCounts.tactician}/1
+                  Tactician: {roleCounts.tactician}/1
                 </span>
                 <span className="px-2 py-0.5 bg-white/5 border border-white/15 text-blue-200 rounded">
                   Trimmer: {roleCounts.trimmer}/4
                 </span>
                 <span className="px-2 py-0.5 bg-white/5 border border-white/15 text-blue-200 rounded">
-                  Prodiere: {roleCounts.bowman}/2
+                  Bowman: {roleCounts.bowman}/2
                 </span>
               </div>
             </div>
@@ -420,7 +420,7 @@ export function RegattaRegistrationPage() {
               </p>
             )}
 
-            {/* Lista Membri Inseriti */}
+            {/* Inserted Members List */}
             {crewMembers.length > 0 && (
               <div className="space-y-2 mb-4">
                 {crewMembers.map((member, index) => (
@@ -448,7 +448,7 @@ export function RegattaRegistrationPage() {
               </div>
             )}
 
-            {/* Form Aggiunta Membro */}
+            {/* Add Member Form */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-4 bg-white/5 rounded-xl border border-white/10">
               <input
                 type="text"
@@ -472,29 +472,29 @@ export function RegattaRegistrationPage() {
                 placeholder={t('registrationPage.phoneNumberOptional')}
               />
 
-              {/* Select Ruolo con Limiti Specifici */}
+              {/* Role Selection with Specific Limits */}
               <select
                 value={newCrewMember.role}
                 onChange={(e) => setNewCrewMember(prev => ({ ...prev, role: e.target.value as CrewRole }))}
                 className="px-3 py-1.5 border border-white/20 bg-white/10 rounded-lg text-sm focus:ring-2 focus:ring-cyan-400 text-blue-100 outline-none cursor-pointer [&>option]:bg-slate-800 [&>option]:text-white"
               >
                 <option value="skipper" disabled={roleCounts.skipper >= ROLE_CONFIG.skipper.max}>
-                  Skipper (Responsabile) ({roleCounts.skipper}/1) {roleCounts.skipper >= 1 ? '— Limite raggiunto' : '— Richiesto'}
+                  Skipper (Responsabile) ({roleCounts.skipper}/1) {roleCounts.skipper >= 1 ? `— ${t('registrationPage.limitReached')}` : `— ${t('registrationPage.required')}`}
                 </option>
                 <option value="helm" disabled={roleCounts.helm >= ROLE_CONFIG.helm.max}>
-                  Timoniere ({roleCounts.helm}/1) {roleCounts.helm >= 1 ? '— Limite raggiunto' : ''}
+                  Helm ({roleCounts.helm}/1) {roleCounts.helm >= 1 ? `— ${t('registrationPage.limitReached')}` : ''}
                 </option>
                 <option value="tactician" disabled={roleCounts.tactician >= ROLE_CONFIG.tactician.max}>
-                  Tattico ({roleCounts.tactician}/1) {roleCounts.tactician >= 1 ? '— Limite raggiunto' : ''}
+                  Tactician ({roleCounts.tactician}/1) {roleCounts.tactician >= 1 ? `— ${t('registrationPage.limitReached')}` : ''}
                 </option>
                 <option value="trimmer" disabled={roleCounts.trimmer >= ROLE_CONFIG.trimmer.max}>
-                  Strimatore (Trimmer) ({roleCounts.trimmer}/4) {roleCounts.trimmer >= 4 ? '— Limite raggiunto' : ''}
+                  Trimmer ({roleCounts.trimmer}/4) {roleCounts.trimmer >= 4 ? `— ${t('registrationPage.limitReached')}` : ''}
                 </option>
                 <option value="bowman" disabled={roleCounts.bowman >= ROLE_CONFIG.bowman.max}>
-                  Vedetta / Prodiere ({roleCounts.bowman}/2) {roleCounts.bowman >= 2 ? '— Limite raggiunto' : ''}
+                  Bowman ({roleCounts.bowman}/2) {roleCounts.bowman >= 2 ? `— ${t('registrationPage.limitReached')}` : ''}
                 </option>
                 <option value="crew">
-                  Membro Equipaggio ({roleCounts.crew}) — Illimitato
+                  Crew Member ({roleCounts.crew}) — Unlimited
                 </option>
               </select>
             </div>
@@ -510,7 +510,7 @@ export function RegattaRegistrationPage() {
             </button>
           </section>
 
-          {/* Section 3: Emergency Contacts */}
+          {/* Section 3: Emergency Contact */}
           <section className="bg-white/10 backdrop-blur-sm rounded-xl shadow-sm border border-white/20 p-6">
             <h2 className="text-xl font-semibold text-white mb-4">🚨 {t('registrationPage.emergencyContact')}</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

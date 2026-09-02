@@ -114,7 +114,7 @@ const LanguageSwitcher: React.FC = () => {
             position: 'fixed',
             top: `${coords.top}px`,
             right: `${coords.right}px`,
-            zIndex: 999999,
+            zIndex: 2147483647, // Max safe integer for z-index - always on top
             backgroundColor: '#0f172a',
             minWidth: '150px',
             borderRadius: '10px',
