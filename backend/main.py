@@ -1,11 +1,14 @@
-from fastapi import FastAPI, Depends, HTTPException, status, UploadFile, File
-from fastapi.middleware.cors import CORSMiddleware
-from sqlmodel import Session, select, SQLModel
-from typing import List, Optional
+import os
+import shutil
 import uuid
 import datetime
+from typing import List, Optional
 
+from fastapi import FastAPI, Depends, HTTPException, status, UploadFile, File
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
+from sqlmodel import Session, select, SQLModel
 
 from backend.database import get_db
 from backend.auth import (
@@ -13,7 +16,9 @@ from backend.auth import (
     get_current_user,
     decode_access_token,
     hash_password,
-    verify_password
+    verify_password,
+    create_password_reset_token,
+    verify_password_reset_token
 )
 from backend.models import (
     User,
@@ -33,7 +38,6 @@ from backend.models import (
     Club,
     ClubMembership
 )
-
 from backend.algorithms.tactical_timing import TacticalTimingEngine, StartLine as TimingStartLine, RaceTiming
 from backend.algorithms.ocs_detection import check_ocs_violation
 from backend.services.scoring_service import ScoringService
@@ -48,6 +52,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Cartella di upload per immagini profilo
+UPLOAD_DIR = "uploads/avatars"
+os.makedirs(UPLOAD_DIR, exist_ok=True)
+app.mount("/static/avatars", StaticFiles(directory=UPLOAD_DIR), name="avatars")
+
 # ============================================================================
 # SCHEMAS
 # ============================================================================
@@ -56,6 +65,18 @@ class UserCreate(BaseModel):
     email: str
     password: str
     full_name: Optional[str] = None
+
+class ForgotPasswordRequest(BaseModel):
+    email: str
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str
+
+class UserProfileUpdate(BaseModel):
+    full_name: Optional[str] = None
+    fiv_number: Optional[str] = None
+    operational_status: Optional[str] = None
 
 class CrewMemberItem(BaseModel):
     name: str
@@ -132,7 +153,7 @@ class MarkResponse(BaseModel):
     last_heartbeat: Optional[datetime.datetime] = None
 
 # ============================================================================
-# AUTH ENDPOINTS
+# AUTH & PROFILE ENDPOINTS
 # ============================================================================
 
 @app.post("/auth/register")
@@ -151,7 +172,21 @@ def register(user_data: UserCreate, db: Session = Depends(get_db)):
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
-    return {"id": new_user.id, "email": new_user.email}
+
+    # Genera ed emette subito il token JWT per reindirizzare l'utente direttamente alla Dashboard
+    token = create_access_token(data={
+        "sub": str(new_user.id),
+        "email": new_user.email,
+        "role": new_user.role,
+        "is_verified": new_user.is_verified
+    })
+
+    return {
+        "id": new_user.id,
+        "email": new_user.email,
+        "access_token": token,
+        "token_type": "bearer"
+    }
 
 @app.post("/auth/login")
 def login(user_data: UserCreate, db: Session = Depends(get_db)):
@@ -166,6 +201,113 @@ def login(user_data: UserCreate, db: Session = Depends(get_db)):
         "is_verified": user.is_verified
     })
     return {"access_token": token, "token_type": "bearer"}
+
+# --- ENDPOINT FORGOT / RESET PASSWORD ---
+
+@app.post("/auth/forgot-password")
+@app.post("/api/v1/auth/forgot-password")
+def forgot_password(req: ForgotPasswordRequest, db: Session = Depends(get_db)):
+    """Richiede link di reset password. Stampa il link in console per ambiente locale."""
+    target_email = req.email.strip().lower()
+    user = db.exec(select(User).where(User.email == target_email)).first()
+    
+    if not user:
+        return {"message": "Se l'indirizzo email è registrato, riceverai a breve le istruzioni di recupero."}
+    
+    reset_token = create_password_reset_token(user.email)
+    reset_link = f"http://localhost:5173/reset-password?token={reset_token}"
+    
+    print("\n" + "=" * 75)
+    print(f"🔑 [RECUPERO PASSWORD] Utente: {user.email}")
+    print(f"🔗 Link di Reimpostazione: {reset_link}")
+    print("=" * 75 + "\n")
+    
+    return {"message": "Se l'indirizzo email è registrato, riceverai a breve le istruzioni di recupero."}
+
+@app.post("/auth/reset-password")
+@app.post("/api/v1/auth/reset-password")
+def reset_password(req: ResetPasswordRequest, db: Session = Depends(get_db)):
+    """Valida il token e aggiorna la password su database PostgreSQL con hash Argon2."""
+    email = verify_password_reset_token(req.token)
+    if not email:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Il link di recupero è scaduto o non valido. Richiedine uno nuovo."
+        )
+
+    user = db.exec(select(User).where(User.email == email)).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Utente non trovato.")
+
+    if len(req.new_password) < 6:
+        raise HTTPException(status_code=400, detail="La password deve contenere almeno 6 caratteri.")
+
+    user.hashed_password = hash_password(req.new_password)
+    user.updated_at = datetime.datetime.utcnow()
+    
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+
+    return {"status": "success", "message": "Password aggiornata con successo! Ora puoi accedere."}
+
+# --- ENDPOINT GESTIONE PROFILO ---
+
+@app.get("/api/v1/users/me")
+@app.get("/users/me")
+def get_user_profile(current_user: User = Depends(get_current_user)):
+    return {
+        "id": str(current_user.id),
+        "email": current_user.email,
+        "full_name": current_user.full_name or current_user.email.split("@")[0],
+        "role": current_user.role,
+        "fiv_number": current_user.fiv_number or "FIV-883920",
+        "operational_status": current_user.operational_status or "available",
+        "avatar_url": current_user.avatar_url
+    }
+
+@app.patch("/api/v1/users/me")
+@app.patch("/users/me")
+def update_user_profile(
+    data: UserProfileUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    if data.full_name is not None:
+        current_user.full_name = data.full_name
+    if data.fiv_number is not None:
+        current_user.fiv_number = data.fiv_number
+    if data.operational_status is not None:
+        current_user.operational_status = data.operational_status
+
+    db.add(current_user)
+    db.commit()
+    db.refresh(current_user)
+    return get_user_profile(current_user)
+
+@app.post("/api/v1/users/me/avatar")
+@app.post("/users/me/avatar")
+def upload_user_avatar(
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    if not file.content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="Il file deve essere un'immagine valida")
+
+    ext = file.filename.split(".")[-1]
+    filename = f"avatar_{current_user.id}_{uuid.uuid4().hex[:8]}.{ext}"
+    file_path = os.path.join(UPLOAD_DIR, filename)
+
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+
+    current_user.avatar_url = f"/static/avatars/{filename}"
+    db.add(current_user)
+    db.commit()
+    db.refresh(current_user)
+
+    return get_user_profile(current_user)
 
 # ============================================================================
 # REGISTRATION, CREW & PAYMENTS
@@ -213,7 +355,6 @@ def create_registration(
 
 @app.get("/registrations/regatta/{regatta_id}/entries")
 def get_regatta_entries(regatta_id: uuid.UUID, db: Session = Depends(get_db)):
-    """Restituisce tutte le barche e relativi equipaggi iscritti a una regata."""
     registrations = db.exec(
         select(Registration).where(Registration.regatta_id == regatta_id)
     ).all()
@@ -254,7 +395,6 @@ def add_crew_member_to_registration(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Permette allo skipper responsabile di invitare un membro all'equipaggio."""
     reg = db.exec(select(Registration).where(Registration.id == registration_id)).first()
     if not reg:
         raise HTTPException(status_code=404, detail="Registration not found")
@@ -298,9 +438,7 @@ def list_regattas(
     organizer_id: Optional[uuid.UUID] = None,
     db: Session = Depends(get_db),
 ):
-    """List all regattas with optional filters."""
     statement = select(Regatta)
-    
     if status:
         statement = statement.where(Regatta.status == status)
     if organizer_id:
@@ -312,7 +450,6 @@ def list_regattas(
 
 @app.post("/regattas", status_code=201)
 def create_regatta(data: dict, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    """Create a new regatta with flexible club lookup and coordinate formatting."""
     if current_user.role not in ["admin", "club_manager"]:
         raise HTTPException(status_code=403, detail="Insufficient permissions")
     
@@ -447,12 +584,8 @@ def upload_certificate(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Upload rating certificate (PDF/XML)."""
     if not file:
         raise HTTPException(status_code=400, detail="No file provided")
-    
-    import os
-    from datetime import datetime as dt
     
     allowed_extensions = {'.pdf', '.xml', '.json'}
     ext = os.path.splitext(file.filename)[1].lower() if hasattr(file, 'filename') and file.filename else ''
@@ -463,7 +596,7 @@ def upload_certificate(
             detail=f"Invalid file type. Allowed: {', '.join(allowed_extensions)}"
         )
     
-    mock_url = f"https://certificates.regatevelichev3.com/{current_user.id}/{dt.now().strftime('%Y%m%d%H%M%S')}{ext}"
+    mock_url = f"https://certificates.regatevelichev3.com/{current_user.id}/{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}{ext}"
     
     return {
         "url": mock_url,
@@ -474,11 +607,10 @@ def upload_certificate(
 
 @app.get("/certificates/verify")
 def verify_certificate(sail_number: str):
-    from datetime import datetime as dt
     return {
         "sail_number": sail_number,
         "is_valid": True,
-        "verified_at": dt.now().isoformat(),
+        "verified_at": datetime.datetime.now().isoformat(),
         "issuer": "ORC International",
     }
 
@@ -497,9 +629,9 @@ def get_time_to_burn(
     registration_id: uuid.UUID, 
     current_lat: float, 
     current_lon: float, 
-    current_sog: float,
-    current_heading: float,
-    race_id: uuid.UUID,
+    current_sog: float, 
+    current_heading: float, 
+    race_id: uuid.UUID, 
     db: Session = Depends(get_db)
 ):
     reg = db.exec(select(Registration).where(Registration.id == registration_id)).first()
@@ -874,9 +1006,7 @@ def update_robotic_buoy_position(
 
 from backend.api.dashboard_api import register_dashboard_routes
 
-# Register dashboard routes with the main application
 register_dashboard_routes(app)
-
 
 if __name__ == "__main__":
     import uvicorn

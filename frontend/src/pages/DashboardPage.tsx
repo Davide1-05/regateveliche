@@ -1,17 +1,24 @@
-import { Link } from 'react-router-dom'
-import { useTranslation } from 'react-i18next'
-import backgroundImg from '../images/background.png'
-import LanguageSwitcher from '../components/LanguageSwitcher'
-import PluginToggle from '../components/PluginToggle'
-import { usePluginState } from '../config/featureFlags'
-import { useDashboardStats } from '../hooks/useDashboardStats'
+import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
+import backgroundImg from '../images/background.png';
+import LanguageSwitcher from '../components/LanguageSwitcher';
+import PluginToggle from '../components/PluginToggle';
+import { usePluginState } from '../config/featureFlags';
+import { useDashboardStats } from '../hooks/useDashboardStats';
+import UserProfileDrawer from '../components/UserProfileDrawer';
 
 function DashboardPage() {
   const { t } = useTranslation();
   const tacticalDashboardEnabled = usePluginState('tactical_dashboard');
-  
-  // Fetch real dashboard statistics with automatic polling
   const { stats, isLoading, error, refetch, isPollingActive } = useDashboardStats(30000);
+
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('user');
+    localStorage.removeItem('user_avatar');
+    window.location.href = '/login';
+  };
   
   return (
     <div className="min-h-screen">
@@ -25,49 +32,54 @@ function DashboardPage() {
 
       {/* Content */}
       <div className="relative z-10">
-        {/* Header */}
-        <header className="bg-white/10 backdrop-blur-md border-b border-white/20 shadow-lg">
+        <header 
+          style={{ position: 'relative', zIndex: 100 }} 
+          className="bg-white/10 backdrop-blur-md border-b border-white/20 shadow-lg"
+        >
           <div className="container mx-auto px-6 py-4 flex justify-between items-center">
             <h1 className="text-2xl font-bold text-white">{t('dashboard.title')}</h1>
+            
             <nav className="flex gap-6 items-center">
-              <Link to="/regattas" className="text-blue-100 hover:text-cyan-300 transition-colors">{t('dashboard.regattas')}</Link>
-              <Link to="/clubs" className="text-blue-100 hover:text-cyan-300 transition-colors">{t('dashboard.clubs')}</Link>
-              <Link to="/map" className="text-blue-100 hover:text-cyan-300 transition-colors">{t('dashboard.regattaMap')}</Link>
-              <button 
-                onClick={() => { 
-                  localStorage.removeItem('token');
-                  localStorage.removeItem('access_token');
-                  localStorage.removeItem('user');
-                  window.location.href = '/login'; 
-                }}
-                className="text-red-300 hover:text-red-200 transition-colors font-semibold"
-              >
-                {t('common.logout')}
-              </button>
+              <Link to="/regattas" className="text-blue-100 hover:text-cyan-300 transition-colors">
+                {t('dashboard.regattas')}
+              </Link>
+              <Link to="/clubs" className="text-blue-100 hover:text-cyan-300 transition-colors">
+                {t('dashboard.clubs')}
+              </Link>
+              <Link to="/map" className="text-blue-100 hover:text-cyan-300 transition-colors">
+                {t('dashboard.regattaMap')}
+              </Link>
               
-              {/* Language Switcher */}
               <LanguageSwitcher />
               
-              {/* Plugin Settings Toggle (inline) - Always visible for Tactical Dashboard */}
               <div className="flex items-center gap-2 pl-4 border-l border-white/20">
                 <span className="text-xs text-blue-200">{t('plugins.tacticalDashboard')}</span>
                 <PluginToggle pluginId="tactical_dashboard" showLabel={false} />
+              </div>
+
+              <div className="flex items-center gap-3 pl-4 border-l border-white/20">
+                <button 
+                  onClick={handleLogout}
+                  className="text-red-300 hover:text-red-200 transition-colors font-semibold text-sm px-2 py-1 rounded-lg hover:bg-red-500/10"
+                >
+                  {t('common.logout', 'Esci')}
+                </button>
+                <UserProfileDrawer onLogout={handleLogout} />
               </div>
             </nav>
           </div>
         </header>
 
-        {/* Main Content */}
-        <main className="container mx-auto px-6 py-8">
-          {/* Welcome Section */}
+        <main 
+          style={{ position: 'relative', zIndex: 1 }} 
+          className="container mx-auto px-6 py-8"
+        >
           <section className="mb-8">
             <h2 className="text-xl font-semibold text-white mb-4">{t('dashboard.welcome')}</h2>
             <p className="text-blue-100">{t('dashboard.description')}</p>
           </section>
 
-          {/* Stats Cards */}
           <div className="grid md:grid-cols-3 gap-6 mb-8">
-            {/* Active Regattas Card */}
             <div className="bg-white/10 backdrop-blur-sm rounded-xl shadow-sm border border-white/20 p-6 hover:bg-white/15 transition-colors relative overflow-hidden">
               {isLoading && (
                 <div className="absolute inset-0 bg-black/20 flex items-center justify-center">
@@ -90,7 +102,6 @@ function DashboardPage() {
               )}
             </div>
 
-            {/* Registered Sailors Card */}
             <div className="bg-white/10 backdrop-blur-sm rounded-xl shadow-sm border border-white/20 p-6 hover:bg-white/15 transition-colors relative overflow-hidden">
               {isLoading && (
                 <div className="absolute inset-0 bg-black/20 flex items-center justify-center">
@@ -113,7 +124,6 @@ function DashboardPage() {
               )}
             </div>
 
-            {/* Upcoming Events Card */}
             <div className="bg-white/10 backdrop-blur-sm rounded-xl shadow-sm border border-white/20 p-6 hover:bg-white/15 transition-colors relative overflow-hidden">
               {isLoading && (
                 <div className="absolute inset-0 bg-black/20 flex items-center justify-center">
@@ -137,29 +147,6 @@ function DashboardPage() {
             </div>
           </div>
 
-          {/* Error State - Show if there's an error and no stats */}
-          {error && !stats && (
-            <div className="mb-8 p-4 bg-red-900/30 border border-red-700 rounded-xl">
-              <div className="flex items-center justify-between">
-                <p className="text-red-200 text-sm">Failed to load dashboard statistics</p>
-                <button
-                  onClick={refetch}
-                  className="px-4 py-2 bg-red-700 hover:bg-red-600 text-white rounded-lg text-sm transition-colors"
-                >
-                  Retry
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Last Updated Timestamp */}
-          {stats?.last_updated && (
-            <p className="text-center text-blue-300/60 text-xs mb-4">
-              Last updated: {new Date(stats.last_updated).toLocaleTimeString()}
-            </p>
-          )}
-
-          {/* Quick Actions */}
           <section className="bg-white/10 backdrop-blur-sm rounded-xl shadow-sm border border-white/20 p-6 hover:bg-white/15 transition-colors">
             <h3 className="text-lg font-semibold text-white mb-4">{t('dashboard.quickActions')}</h3>
             <div className={`grid gap-4 ${tacticalDashboardEnabled ? 'md:grid-cols-2' : 'md:grid-cols-3'}`}>
@@ -179,7 +166,6 @@ function DashboardPage() {
                 </div>
               </Link>
 
-              {/* Tactical Dashboard - only shown when plugin is enabled */}
               {tacticalDashboardEnabled && (
                 <Link to="/tactical-dashboard" className="flex items-center gap-3 p-4 bg-cyan-500/10 border border-cyan-400/30 rounded-lg hover:bg-cyan-500/20 transition-colors group">
                   <span className="text-2xl group-hover:scale-110 transition-transform">📡</span>
@@ -202,7 +188,7 @@ function DashboardPage() {
         </main>
       </div>
     </div>
-  )
+  );
 }
 
-export default DashboardPage
+export default DashboardPage;

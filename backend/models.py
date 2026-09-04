@@ -31,6 +31,11 @@ class User(SQLModel, table=True):
     hashed_password: str = Field(max_length=255)
     full_name: Optional[str] = Field(max_length=255, default=None)
     
+    # Campi profilo e tessera federale
+    fiv_number: Optional[str] = Field(default="FIV-883920", max_length=50)
+    avatar_url: Optional[str] = Field(default=None, max_length=500)
+    operational_status: Optional[str] = Field(default="available", max_length=50)
+    
     # RBAC Role (RF08)
     role: str = Field(
         default="sailor",
@@ -70,7 +75,7 @@ class RefreshToken(SQLModel, table=True):
         foreign_key="users.id",
         index=True
     )
-    token_hash: str = Field(max_length=255)  # Hashed refresh token
+    token_hash: str = Field(max_length=255)
     expires_at: datetime = Field(index=True)
     created_at: datetime = Field(
         default_factory=datetime.utcnow,
@@ -100,7 +105,6 @@ class Club(SQLModel, table=True):
     city: Optional[str] = Field(max_length=100)
     postal_code: Optional[str] = Field(max_length=20)
     
-    # Certification level (Bronze, Silver, Gold, Platinum - BO-03)
     certification_level: str = Field(
         default="bronze",
         max_length=20
@@ -127,7 +131,7 @@ class ClubMembership(SQLModel, table=True):
     )
     user_id: uuid.UUID = Field(foreign_key="users.id")
     club_id: uuid.UUID = Field(foreign_key="clubs.id")
-    role: str = Field(default="member", max_length=50)  # member, officer, captain
+    role: str = Field(default="member", max_length=50)
     
     created_at: datetime = Field(
         default_factory=datetime.utcnow,
@@ -143,9 +147,7 @@ class ClubMembership(SQLModel, table=True):
 # ============================================================================
 
 class Registration(SQLModel, table=True):
-    """
-    Smart registration form with eIDAS compliant digital signatures.
-    """
+    """Smart registration form with eIDAS compliant digital signatures."""
     
     __tablename__ = "registrations"
     
@@ -157,16 +159,13 @@ class Registration(SQLModel, table=True):
     regatta_id: uuid.UUID = Field(foreign_key="regattas.id", index=True)
     user_id: uuid.UUID = Field(foreign_key="users.id", index=True)
     
-    # Boat information
     boat_class: str = Field(max_length=100)
     hull_number: Optional[str] = Field(max_length=50)
     sail_number: str = Field(max_length=50)
     
-    # Crew information
     skipper_name: str = Field(max_length=255)
-    crew_names: Optional[str] = Field(max_length=1000, default=None)  # JSON array as string
+    crew_names: Optional[str] = Field(max_length=1000, default=None)
     
-    # eIDAS Digital Signature (RF01)
     signature_hash: str = Field(
         max_length=64,
         index=True
@@ -174,14 +173,12 @@ class Registration(SQLModel, table=True):
     signature_timestamp: Optional[datetime] = None
     signature_certificate: Optional[str] = Field(default=None, max_length=1000)
     
-    # Payment status
     registration_fee: float = Field(default=0.0)
     payment_status: str = Field(
         default="pending",
         max_length=20
     )
     
-    # Status
     status: str = Field(
         default="confirmed",
         max_length=20,
@@ -216,8 +213,8 @@ class CrewMember(SQLModel, table=True):
     full_name: str = Field(max_length=255)
     email: str = Field(max_length=255, index=True)
     phone: Optional[str] = Field(default=None, max_length=50)
-    role: str = Field(default="crew", max_length=50)  # skipper, helm, tactician, trimmer, bowman, crew
-    status: str = Field(default="confirmed", max_length=20)  # invited, confirmed, declined
+    role: str = Field(default="crew", max_length=50)
+    status: str = Field(default="confirmed", max_length=20)
 
     created_at: datetime = Field(
         default_factory=datetime.utcnow,
@@ -246,18 +243,14 @@ class Regatta(SQLModel, table=True):
     
     organizer_id: uuid.UUID = Field(foreign_key="clubs.id", index=True)
     
-    # Dates
     start_date: datetime = Field(index=True)
     end_date: datetime = Field(index=True)
     
-    # Location
     latitude: float = Field(nullable=True)
     longitude: float = Field(nullable=True)
     
-    # Scoring class
     scoring_class: str = Field(max_length=50)
     
-    # Status
     status: str = Field(
         default="planning",
         max_length=20
@@ -284,14 +277,11 @@ class Race(SQLModel, table=True):
     regatta_id: uuid.UUID = Field(foreign_key="regattas.id", index=True)
     race_number: int
     
-    # Race timing
     scheduled_start: datetime = Field(index=True)
     actual_start: Optional[datetime] = None
     
-    # Course definition
     course_type: str = Field(max_length=50)
     
-    # Status
     status: str = Field(
         default="scheduled",
         max_length=20
@@ -637,8 +627,8 @@ class UserNotificationPreference(SQLModel, table=True):
     user_id: uuid.UUID = Field(foreign_key="users.id", unique=True, index=True)
     
     app_notifications_enabled: bool = Field(default=True)
-    whatsapp_enabled: bool = Field(default=False)
-    sms_enabled: bool = Field(default=False)
+    whatsapp_enabled: bool = False
+    sms_enabled: bool = False
     notification_phone: Optional[str] = Field(max_length=50, default=None)
     quiet_hours_start: Optional[int] = Field(default=22)
     quiet_hours_end: Optional[int] = Field(default=7)

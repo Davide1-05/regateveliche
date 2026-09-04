@@ -88,6 +88,36 @@ def hash_refresh_token(token: str) -> str:
 
 
 # ============================================================================
+# PASSWORD RESET UTILITIES (TEMPORARY TOKEN)
+# ============================================================================
+
+def create_password_reset_token(email: str) -> str:
+    """Genera un token JWT dedicato al reset password (valido 20 minuti)."""
+    expire = datetime.utcnow() + timedelta(minutes=20)
+    to_encode = {
+        "sub": email,
+        "type": "password_reset",
+        "exp": expire
+    }
+    return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
+
+
+def verify_password_reset_token(token: str) -> Optional[str]:
+    """Valida il token di reset e restituisce l'email se valido e non scaduto."""
+    try:
+        payload = jwt.decode(
+            token,
+            settings.SECRET_KEY,
+            algorithms=[settings.JWT_ALGORITHM]
+        )
+        if payload.get("type") != "password_reset":
+            return None
+        return payload.get("sub")
+    except (jwt.ExpiredSignatureError, jwt.InvalidTokenError):
+        return None
+
+
+# ============================================================================
 # USER VERIFICATION
 # ============================================================================
 

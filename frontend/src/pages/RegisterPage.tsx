@@ -7,44 +7,114 @@ import LanguageSwitcher from '../components/LanguageSwitcher'
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
+// Validazione email standard
+const isValidEmail = (email: string): boolean => {
+  const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+  return regex.test(email.trim())
+}
+
+// Password: min 8 caratteri, almeno 1 minuscola, 1 MAIUSCOLA, 1 numero e 1 carattere speciale
+const isValidPassword = (password: string): boolean => {
+  const regex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?~`])[A-Za-z\d!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?~`]{8,}$/
+  return regex.test(password)
+}
+
+// Vincolo Nome: Almeno Nome e Cognome (2 parole), solo lettere/spazi/apostrofi, niente numeri
+const isValidFullName = (name: string): boolean => {
+  const trimmed = name.trim()
+  const parts = trimmed.split(/\s+/)
+  const lettersOnly = /^[A-Za-zÀ-ÖØ-öø-ÿ\s'-]+$/
+  return parts.length >= 2 && trimmed.length >= 5 && lettersOnly.test(trimmed)
+}
+
 function RegisterPage() {
-  const { t } = useTranslation();
+  const { t } = useTranslation()
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
-  const [error, setError] = useState<string | null>(null)
+  
+  const [validationErrors, setValidationErrors] = useState<string[]>([])
+  const [apiError, setApiError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const navigate = useNavigate()
 
+  const validateForm = (): string[] => {
+    const errors: string[] = []
+
+    if (!isValidFullName(name)) {
+      errors.push('Inserisci sia Nome che Cognome (senza numeri o simboli speciali).')
+    }
+
+    if (!isValidEmail(email)) {
+      errors.push('Inserisci un indirizzo email valido.')
+    }
+
+    if (!isValidPassword(password)) {
+      errors.push(
+        'La password deve contenere almeno 8 caratteri, una lettera maiuscola, una minuscola, un numero e un carattere speciale (es. !@#$%).'
+      )
+    }
+
+    if (password !== confirmPassword) {
+      errors.push(t('register.confirmPassword') || 'Le password non coincidono.')
+    }
+
+    return errors
+  }
+
+  // Prevenzione submit accidentale premendo Invio
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLFormElement>) => {
+    if (e.key === 'Enter' && (e.target as HTMLElement).tagName === 'INPUT') {
+      e.preventDefault()
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setError(null)
-    
-    if (password !== confirmPassword) {
-      setError(t('register.confirmPassword'))
+    setApiError(null)
+
+    const errors = validateForm()
+    if (errors.length > 0) {
+      setValidationErrors(errors)
       return
     }
-    
+
+    setValidationErrors([])
     setLoading(true)
 
     try {
+      // 1. Registrazione utente
       const response = await axios.post(`${API_BASE_URL}/auth/register`, {
-        name,
-        email,
+        full_name: name.trim(),
+        email: email.trim(),
         password,
       })
 
-      localStorage.setItem('access_token', response.data.access_token)
-      localStorage.setItem('token_type', response.data.token_type || 'bearer')
+      let token = response.data?.access_token
+      let tokenType = response.data?.token_type || 'bearer'
+
+      // Fallback: se il backend rispondeva con il vecchio formato senza token, effettua login istantaneo
+      if (!token) {
+        const loginRes = await axios.post(`${API_BASE_URL}/auth/login`, {
+          email: email.trim(),
+          password,
+        })
+        token = loginRes.data.access_token
+        tokenType = loginRes.data.token_type || 'bearer'
+      }
+
+      // Salva token di autenticazione e reindirizza alla Dashboard
+      localStorage.setItem('access_token', token)
+      localStorage.setItem('token_type', tokenType)
       navigate('/dashboard')
     } catch (err: any) {
       if (axios.isAxiosError(err)) {
-        setError(
+        setApiError(
           err.response?.data?.detail || t('register.createAccount')
         )
       } else {
-        setError(t('common.loading'))
+        setApiError(t('common.loading'))
       }
     } finally {
       setLoading(false)
@@ -53,7 +123,6 @@ function RegisterPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center px-4 py-12">
-      {/* Background overlay for auth pages */}
       <div
         className="fixed inset-0 bg-cover bg-center bg-no-repeat"
         style={{ backgroundImage: `url(${backgroundImg})` }}
@@ -79,13 +148,23 @@ function RegisterPage() {
           <h1 className="text-3xl font-bold text-center text-white mb-2">{t('register.title')}</h1>
           <p className="text-center text-blue-200 mb-8">{t('login.signIn')}</p>
 
-          {error && (
-            <div className="mb-4 p-3 bg-red-500/20 border border-red-400/40 rounded-lg">
-              <p className="text-sm text-red-200">{error}</p>
+          {/* Box errori di validazione client */}
+          {validationErrors.length > 0 && (
+            <div className="mb-4 p-3 bg-red-500/20 border border-red-400/40 rounded-lg space-y-1">
+              {validationErrors.map((err, idx) => (
+                <p key={idx} className="text-xs text-red-200 font-semibold text-center">{err}</p>
+              ))}
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Errore API Backend */}
+          {apiError && (
+            <div className="mb-4 p-3 bg-red-500/20 border border-red-400/40 rounded-lg">
+              <p className="text-sm text-red-200 text-center font-semibold">{apiError}</p>
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit} onKeyDown={handleKeyDown} className="space-y-5">
             <div>
               <label htmlFor="name" className="block text-sm font-medium text-blue-100 mb-1">
                 {t('register.fullName')}
@@ -94,11 +173,14 @@ function RegisterPage() {
                 id="name"
                 type="text"
                 value={name}
-                onChange={(e) => setName(e.target.value)}
+                onChange={(e) => {
+                  setName(e.target.value)
+                  if (validationErrors.length > 0) setValidationErrors([])
+                }}
                 required
                 disabled={loading}
-                className="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-blue-300 focus:ring-2 focus:ring-cyan-400 focus:border-transparent outline-none transition-all disabled:bg-white/5 disabled:text-blue-300"
-                placeholder="John Doe"
+                className="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-blue-300 focus:ring-2 focus:ring-cyan-400 focus:border-transparent outline-none transition-all disabled:bg-white/5"
+                placeholder="Mario Rossi"
               />
             </div>
 
@@ -110,10 +192,13 @@ function RegisterPage() {
                 id="email"
                 type="email"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => {
+                  setEmail(e.target.value)
+                  if (validationErrors.length > 0) setValidationErrors([])
+                }}
                 required
                 disabled={loading}
-                className="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-blue-300 focus:ring-2 focus:ring-cyan-400 focus:border-transparent outline-none transition-all disabled:bg-white/5 disabled:text-blue-300"
+                className="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-blue-300 focus:ring-2 focus:ring-cyan-400 focus:border-transparent outline-none transition-all disabled:bg-white/5"
                 placeholder="you@example.com"
               />
             </div>
@@ -126,11 +211,14 @@ function RegisterPage() {
                 id="password"
                 type="password"
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={(e) => {
+                  setPassword(e.target.value)
+                  if (validationErrors.length > 0) setValidationErrors([])
+                }}
                 required
                 disabled={loading}
-                className="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-blue-300 focus:ring-2 focus:ring-cyan-400 focus:border-transparent outline-none transition-all disabled:bg-white/5 disabled:text-blue-300"
-                placeholder="••••••••"
+                className="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-blue-300 focus:ring-2 focus:ring-cyan-400 focus:border-transparent outline-none transition-all disabled:bg-white/5"
+                placeholder="Min. 8 caratt., 1 maiusc., 1 num., 1 spec."
               />
             </div>
 
@@ -142,10 +230,13 @@ function RegisterPage() {
                 id="confirmPassword"
                 type="password"
                 value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
+                onChange={(e) => {
+                  setConfirmPassword(e.target.value)
+                  if (validationErrors.length > 0) setValidationErrors([])
+                }}
                 required
                 disabled={loading}
-                className="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-blue-300 focus:ring-2 focus:ring-cyan-400 focus:border-transparent outline-none transition-all disabled:bg-white/5 disabled:text-blue-300"
+                className="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-blue-300 focus:ring-2 focus:ring-cyan-400 focus:border-transparent outline-none transition-all disabled:bg-white/5"
                 placeholder="••••••••"
               />
             </div>
@@ -153,7 +244,7 @@ function RegisterPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-gradient-to-r from-cyan-400 to-blue-400 text-blue-900 py-3 rounded-lg font-bold hover:from-cyan-300 hover:to-blue-300 transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full bg-gradient-to-r from-cyan-400 to-blue-400 text-blue-900 py-3 rounded-lg font-bold hover:from-cyan-300 hover:to-blue-300 transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed mt-2"
             >
               {loading ? t('register.registering') : t('register.createAccount')}
             </button>
